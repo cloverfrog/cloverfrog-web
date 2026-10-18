@@ -38,7 +38,7 @@ function setAuthenticated(value) {
   authenticated = value;
   enter.disabled = !value;
   if (!value) {
-    started = false; current = null; pending = null;
+    started = false; current = null; pending = null; needsEntryPosition = false;
     clearTimeout(boundary);
     video.clear().catch(() => {});
     document.querySelector('#current').textContent = '登录后进入频道';
@@ -51,6 +51,7 @@ function setAuthenticated(value) {
   }
 }
 let busy = false, current = null, boundary = null, pending = null, started = false;
+let needsEntryPosition = false;
 const label = p => `${p.title} · 第 ${p.season} 季 第 ${p.episode} 集`;
 const identity = p => `${p.programStart}:${p.playUrl}`;
 function applyPosition() {
@@ -60,7 +61,9 @@ function applyPosition() {
     setStatus('视频已结束，等待节目时间线切换；请核对节目时长。', true);
     return;
   }
-  if (Math.abs(video.currentTime - target) > 30) video.seek(target).catch(() => {});
+  // The playback adapter serializes seek and play: never start before entry positioning.
+  if (needsEntryPosition || Math.abs(video.currentTime - target) > 30) video.seek(target).catch(() => {});
+  needsEntryPosition = false;
   pending = null;
   if (started && video.paused) playChannel();
 }
@@ -86,6 +89,7 @@ async function sync() {
     pending = {offset:data.offset + delay, received};
     if (current !== identity(data)) {
       current = identity(data);
+      needsEntryPosition = true;
       video.load(data.playUrl).catch(() => {});
     }
     document.querySelector('#current').textContent = label(data);
@@ -136,9 +140,9 @@ enter.onclick = () => {
   video.unlock();
   playbackIssue = '';
   started = true;
+  needsEntryPosition = true;
   setStatus('正在进入频道…', true);
-  // Preserve the user gesture for an already loaded source.
-  if (video.currentSrc && !video.error) playChannel();
+  // Audio is unlocked above; playback starts only after applyPosition queues the seek.
   sync();
 };
 function revealControls() {
