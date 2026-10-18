@@ -1,71 +1,76 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#191b20" media="(prefers-color-scheme: dark)">
-  <title>正在加载游戏 · cloverfrog 小游戏</title>
-  <link rel="stylesheet" href="assets/app.css">
-  <script>
-    window.RufflePlayer = window.RufflePlayer || {};
-    window.RufflePlayer.config = {
-      polyfills: false,
-      favorFlash: true,
-      allowFullscreen: true,
-      showSwfDownload: true,
-      logLevel: "error"
-    };
-  </script>
-  <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
-</head>
-<body data-page="play">
-  <header class="site-header site-header--dark">
-    <div class="site-header__inner">
-      <a class="brand brand--light" href="./" aria-label="返回游戏柜首页">
-        <span class="brand__mark" aria-hidden="true">C</span>
-        <span>
-          <strong>cloverfrog 小游戏</strong>
-          <small>personal collection</small>
-        </span>
-      </a>
-      <a class="button button--outline" href="./">返回列表</a>
-    </div>
-  </header>
-
-  <main class="play-shell">
-    <section class="play-heading">
-      <div>
-        <p id="play-kicker" class="eyebrow eyebrow--light">NOW PLAYING</p>
-        <h1 id="play-title">正在加载游戏...</h1>
-        <p id="play-subtitle" class="play-subtitle"></p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#191b20" media="(prefers-color-scheme: dark)" />
+    <title>正在加载游戏 · cloverfrog 小游戏</title>
+    <link rel="stylesheet" href="assets/app.css" />
+    <!-- 必须先设置配置再加载 Ruffle；关闭全页 Flash 替换，播放器由 app.js 手动创建。 -->
+    <script>
+      window.RufflePlayer = window.RufflePlayer || {};
+      window.RufflePlayer.config = {
+        polyfills: false,
+        favorFlash: true,
+        allowFullscreen: true,
+        showSwfDownload: true,
+        logLevel: 'error'
+      };
+    </script>
+    <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
+  </head>
+  <body data-page="play">
+    <header class="site-header site-header--dark">
+      <div class="site-header__inner">
+        <a class="brand brand--light" href="./" aria-label="返回游戏柜首页">
+          <span class="brand__mark" aria-hidden="true">C</span>
+          <span>
+            <strong>cloverfrog 小游戏</strong>
+            <small>personal collection</small>
+          </span>
+        </a>
+        <a class="button button--outline" href="./">返回列表</a>
       </div>
-      <div class="button-row">
-        <button id="reload-game" class="button button--outline" type="button">重新载入</button>
-        <button id="fullscreen-game" class="button button--accent" type="button">全屏</button>
-      </div>
-    </section>
+    </header>
 
-    <section class="player-frame" aria-label="Flash 游戏播放器">
-      <div id="player-container" class="player-container">
-        <div class="loading-state">
-          <span class="spinner" aria-hidden="true"></span>
-          <span id="player-status">正在准备 Ruffle...</span>
+    <main class="play-shell">
+      <section class="play-heading">
+        <div>
+          <p id="play-kicker" class="eyebrow eyebrow--light">NOW PLAYING</p>
+          <h1 id="play-title">正在加载游戏...</h1>
+          <p id="play-subtitle" class="play-subtitle"></p>
         </div>
-      </div>
-    </section>
+        <div class="button-row">
+          <button id="reload-game" class="button button--outline" type="button">重新载入</button>
+          <button id="fullscreen-game" class="button button--accent" type="button">全屏</button>
+        </div>
+      </section>
 
-    <section class="play-details">
-      <div class="details-copy">
-        <p class="eyebrow">GAME NOTES</p>
-        <h2 id="details-title">游戏信息</h2>
-        <p id="details-copy">在播放器内右键打开 Ruffle 官方存档管理器，可进行 .sol 导入导出和 saves.zip 全量备份。主界面也提供了站点全部存档的 JSON 备份功能。</p>
-      </div>
-    </section>
-  </main>
+      <section class="player-frame" aria-label="Flash 游戏播放器">
+        <div id="player-container" class="player-container">
+          <div class="loading-state">
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="player-status">正在准备 Ruffle...</span>
+          </div>
+        </div>
+      </section>
 
-  <script src="assets/config.js"></script>
-  <script src="assets/app.js"></script>
-</body>
+      <section class="play-details">
+        <div class="details-copy">
+          <p class="eyebrow">GAME NOTES</p>
+          <h2 id="details-title">游戏信息</h2>
+          <p id="details-copy">
+            在播放器内右键打开 Ruffle 官方存档管理器，可进行 .sol 导入导出和 saves.zip
+            全量备份。主界面也提供了站点全部存档的 JSON 备份功能。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <!-- app.js 依赖资源目录配置，加载顺序不可交换。 -->
+    <script src="assets/config.js"></script>
+    <script src="assets/app.js"></script>
+  </body>
 </html>

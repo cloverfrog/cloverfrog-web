@@ -1,71 +1,79 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#191b20" media="(prefers-color-scheme: dark)">
-  <title>cloverfrog 小游戏</title>
-  <link rel="stylesheet" href="assets/app.css">
-</head>
-<body data-page="index">
-  <header class="site-header">
-    <div class="site-header__inner">
-      <a class="brand" href="./" aria-label="返回游戏柜首页">
-        <span class="brand__mark" aria-hidden="true">C</span>
-        <span>
-          <strong>cloverfrog 小游戏</strong>
-          <small>personal collection</small>
-        </span>
-      </a>
-      <div class="header-meta">
-        <a class="home-link" href="../../">返回主站 ↗</a>
-        <span id="game-count">加载中</span>
-        <a class="text-link" href="#backup">存档备份</a>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#191b20" media="(prefers-color-scheme: dark)" />
+    <title>cloverfrog 小游戏</title>
+    <link rel="stylesheet" href="assets/app.css" />
+  </head>
+  <body data-page="index">
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="brand" href="./" aria-label="返回游戏柜首页">
+          <span class="brand__mark" aria-hidden="true">C</span>
+          <span>
+            <strong>cloverfrog 小游戏</strong>
+            <small>personal collection</small>
+          </span>
+        </a>
+        <div class="header-meta">
+          <a class="home-link" href="../../">返回主站 ↗</a>
+          <span id="game-count">加载中</span>
+          <a class="text-link" href="#backup">存档备份</a>
+        </div>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <main class="page-shell">
-    <section class="toolbar" aria-label="游戏筛选">
-      <div>
-        <h1>个人收藏小游戏</h1>
+    <main class="page-shell">
+      <section class="toolbar" aria-label="游戏筛选">
+        <div>
+          <h1>个人收藏小游戏</h1>
+        </div>
+        <label class="search-box">
+          <span aria-hidden="true">⌕</span>
+          <input id="game-search" type="search" placeholder="搜索名称或原名" autocomplete="off" />
+        </label>
+      </section>
+
+      <div class="filter-row">
+        <div class="filter-group" role="group" aria-label="筛选条件"></div>
+        <p id="result-count" class="result-count"></p>
       </div>
-      <label class="search-box">
-        <span aria-hidden="true">⌕</span>
-        <input id="game-search" type="search" placeholder="搜索名称或原名" autocomplete="off">
-      </label>
-    </section>
 
-    <div class="filter-row">
-      <div class="filter-group" role="group" aria-label="筛选条件"></div>
-      <p id="result-count" class="result-count"></p>
-    </div>
+      <section id="game-grid" class="game-grid" aria-live="polite"></section>
+      <p id="empty-state" class="empty-state" hidden>没有找到匹配的游戏。</p>
 
-    <section id="game-grid" class="game-grid" aria-live="polite"></section>
-    <p id="empty-state" class="empty-state" hidden>没有找到匹配的游戏。</p>
+      <section id="backup" class="backup-panel">
+        <div>
+          <p class="eyebrow">LOCAL BACKUP</p>
+          <h2>本地存档</h2>
+          <p>
+            Ruffle 官方存档管理器可在播放器内右键打开，支持单个 .sol 和全部 saves.zip。这里的 JSON
+            备份适合迁移本站存档，导入会覆盖同名存档。
+          </p>
+        </div>
+        <div class="button-row">
+          <button id="export-all" class="button button--dark" type="button">导出全部存档</button>
+          <label class="button button--light" for="import-all">导入存档 JSON</label>
+          <input
+            id="import-all"
+            class="visually-hidden"
+            type="file"
+            accept="application/json,.json"
+          />
+        </div>
+        <p id="backup-status" class="status-text" role="status"></p>
+      </section>
+    </main>
 
-    <section id="backup" class="backup-panel">
-      <div>
-        <p class="eyebrow">LOCAL BACKUP</p>
-        <h2>本地存档</h2>
-        <p>Ruffle 官方存档管理器可在播放器内右键打开，支持单个 .sol 和全部 saves.zip。这里的 JSON 备份适合迁移本站存档，导入会覆盖同名存档。</p>
-      </div>
-      <div class="button-row">
-        <button id="export-all" class="button button--dark" type="button">导出全部存档</button>
-        <label class="button button--light" for="import-all">导入存档 JSON</label>
-        <input id="import-all" class="visually-hidden" type="file" accept="application/json,.json">
-      </div>
-      <p id="backup-status" class="status-text" role="status"></p>
-    </section>
-  </main>
+    <footer class="site-footer">
+      <span>Powered by Ruffle</span>
+    </footer>
 
-  <footer class="site-footer">
-    <span>Powered by Ruffle</span>
-  </footer>
-
-  <script src="assets/config.js"></script>
-  <script src="assets/app.js"></script>
-</body>
+    <script src="assets/config.js"></script>
+    <script src="assets/app.js"></script>
+  </body>
 </html>

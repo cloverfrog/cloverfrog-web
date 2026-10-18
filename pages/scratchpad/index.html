@@ -1,52 +1,99 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#181b20" media="(prefers-color-scheme: dark)">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
-  <title>Scratchpad · cloverfrog</title>
-  <link rel="stylesheet" href="app.css">
-</head>
-<body>
-  <main>
-    <header><a href="../../">← cloverfrog</a><h1>Scratchpad</h1></header>
-    <p id="notice" role="status" aria-live="polite"></p>
-    <section id="workspace" hidden>
-      <div class="toolbar"><nav id="drafts" aria-label="草稿列表"></nav><button id="refresh">刷新列表</button><button id="new">＋ 新建</button></div>
-      <p id="empty">没有草稿。点击“新建”开始。</p>
-      <section id="editor" hidden>
-        <label class="title-label">标题<input id="title" maxlength="500" placeholder="未命名草稿" autocomplete="off"></label>
-        <div class="display-toolbar" role="group" aria-label="正文显示设置">
-          <label class="content-label" for="content">正文</label>
-          <button id="font-smaller" type="button" aria-label="减小正文字号">A−</button>
-          <output id="font-size" aria-live="polite">16px</output>
-          <button id="font-larger" type="button" aria-label="增大正文字号">A+</button>
-          <details class="display-settings">
-            <summary>显示设置</summary>
-            <div class="display-options">
-              <label>字体<select id="font-family"><option value="mono">等宽字体</option><option value="system">系统字体</option></select></label>
-              <label>行高<select id="line-height"><option value="1.65">默认 · 1.65</option><option value="1.5">普通 · 1.5</option><option value="1.8">宽松 · 1.8</option></select></label>
-              <label class="wrap-option"><input id="word-wrap" type="checkbox" checked>自动换行</label>
-            </div>
-          </details>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#181b20" media="(prefers-color-scheme: dark)" />
+    <!-- 草稿和文件统一走本站代理，页面只允许本站脚本、连接和表单提交。 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
+    <title>Scratchpad · cloverfrog</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <a href="../../">← cloverfrog</a>
+        <h1>Scratchpad</h1>
+      </header>
+      <p id="notice" role="status" aria-live="polite"></p>
+      <!-- 登录并恢复本机草稿后显示工作台；标题和正文由脚本控制，输入不会自动保存。 -->
+      <section id="workspace" hidden>
+        <div class="toolbar">
+          <nav id="drafts" aria-label="草稿列表"></nav>
+          <button id="refresh">刷新列表</button><button id="new">＋ 新建</button>
         </div>
-        <textarea id="content" spellcheck="false" placeholder="在这里整理提示词、Markdown 或代码…"></textarea>
-        <footer><span id="status" role="status"></span><button id="save">保存</button><button id="copy">复制全文</button><button id="complete">完成</button></footer>
+        <p id="empty">没有草稿。点击“新建”开始。</p>
+        <!-- 没有选中草稿时隐藏编辑区，避免编辑没有归属的文本。 -->
+        <section id="editor" hidden>
+          <label class="title-label"
+            >标题<input id="title" maxlength="500" placeholder="未命名草稿" autocomplete="off"
+          /></label>
+          <div class="display-toolbar" role="group" aria-label="正文显示设置">
+            <label class="content-label" for="content">正文</label>
+            <button id="font-smaller" type="button" aria-label="减小正文字号">A−</button>
+            <output id="font-size" aria-live="polite">16px</output>
+            <button id="font-larger" type="button" aria-label="增大正文字号">A+</button>
+            <details class="display-settings">
+              <summary>显示设置</summary>
+              <div class="display-options">
+                <label
+                  >字体<select id="font-family">
+                    <option value="mono">等宽字体</option>
+                    <option value="system">系统字体</option>
+                  </select></label
+                >
+                <label
+                  >行高<select id="line-height">
+                    <option value="1.65">默认 · 1.65</option>
+                    <option value="1.5">普通 · 1.5</option>
+                    <option value="1.8">宽松 · 1.8</option>
+                  </select></label
+                >
+                <label class="wrap-option"
+                  ><input id="word-wrap" type="checkbox" checked />自动换行</label
+                >
+              </div>
+            </details>
+          </div>
+          <textarea
+            id="content"
+            spellcheck="false"
+            placeholder="在这里整理提示词、Markdown 或代码…"
+          ></textarea>
+          <footer>
+            <span id="status" role="status"></span><button id="save">保存</button
+            ><button id="copy">复制全文</button><button id="complete">完成</button>
+          </footer>
+        </section>
+        <div id="undo" aria-live="polite"></div>
+        <small
+          >Ctrl / Cmd + S 保存，Ctrl / Cmd + Enter 复制全文。未保存修改以 *
+          标记。登录或刷新时自动清理最后保存已满 3 天的草稿；正在编辑的修改暂保留。</small
+        >
       </section>
-      <div id="undo" aria-live="polite"></div>
-      <small>Ctrl / Cmd + S 保存，Ctrl / Cmd + Enter 复制全文。未保存修改以 * 标记。登录或刷新时自动清理最后保存已满 3 天的草稿；正在编辑的修改暂保留。</small>
-    </section>
-    <section id="file-panel" hidden aria-labelledby="file-heading">
-      <div class="toolbar"><h2 id="file-heading">文件速传</h2><button id="file-refresh">刷新文件</button></div>
-      <p>同一账号跨设备上传、下载。单个文件最多 50 MB；登录、刷新或上传时自动清理上传已满 3 天的文件。</p>
-      <div class="file-upload-row"><label for="file-input">选择文件<input id="file-input" type="file" multiple></label><button id="file-upload">上传</button><button id="file-cancel" hidden>取消上传</button></div>
-      <p id="file-status" role="status" aria-live="polite"></p>
-      <ul id="file-list" aria-label="已上传文件"></ul>
-    </section>
-  </main>
-  <script type="module" src="app.mjs"></script>
-</body>
+      <!-- 文件中转独立于文本草稿，选择文件后仍需明确点击上传。 -->
+      <section id="file-panel" hidden aria-labelledby="file-heading">
+        <div class="toolbar">
+          <h2 id="file-heading">文件速传</h2>
+          <button id="file-refresh">刷新文件</button>
+        </div>
+        <p>
+          同一账号跨设备上传、下载。单个文件最多 50 MB；登录、刷新或上传时自动清理上传已满 3
+          天的文件。
+        </p>
+        <div class="file-upload-row">
+          <label for="file-input">选择文件<input id="file-input" type="file" multiple /></label
+          ><button id="file-upload">上传</button><button id="file-cancel" hidden>取消上传</button>
+        </div>
+        <p id="file-status" role="status" aria-live="polite"></p>
+        <ul id="file-list" aria-label="已上传文件"></ul>
+      </section>
+    </main>
+    <script type="module" src="app.mjs"></script>
+  </body>
 </html>

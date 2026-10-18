@@ -1,77 +1,500 @@
-:root { color-scheme: light dark; --header: rgba(244,239,230,.92); --cover: #ded6ca; --tag-text: #a44b2e; --tag-bg: #f8dfd3; --panel: #ebe3d6; --success: #4d795a; --error: #b34e39; --focus: #21874a; --paper: #f4efe6; --ink: #202228; --muted: #77736c; --line: #d9d1c3; --accent: #0ec314; --dark: #191b20; --card: #fffdf9; }
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; color: var(--ink); background: var(--paper); font-family: 'Noto Sans SC', system-ui, sans-serif; }
-body[data-page="play"] { color: var(--ink); background: var(--paper); }
-a { color: inherit; text-decoration: none; }
-.home-link { font: 500 13px system-ui, sans-serif; letter-spacing: 0; text-transform: none; }
-a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
-button, input { font: inherit; }
-.site-header { border-bottom: 1px solid var(--line); background: var(--header); }
-.site-header--dark { color: var(--ink); border-color: var(--line); background: var(--header); }
-.site-header__inner, .page-shell, .play-shell, .site-footer { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
-.site-header__inner { min-height: 78px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand__mark { display: grid; place-items: center; width: 36px; height: 36px; color: white; background: var(--accent); font: 700 21px 'Space Mono', monospace; }
-.brand strong, .brand small { display: block; }
-.brand strong { font-size: 16px; letter-spacing: .04em; }
-.brand small, .header-meta, .eyebrow, .tool-label { color: var(--muted); font: 11px 'Space Mono', monospace; letter-spacing: .11em; text-transform: uppercase; }
-.brand--light small, .eyebrow--light { color: var(--muted); }
-.header-meta { display: flex; align-items: center; gap: 24px; }
-.text-link { color: var(--accent); font: 600 13px 'Noto Sans SC', sans-serif; letter-spacing: 0; text-transform: none; }
-.page-shell { padding: 62px 0 80px; }
-.toolbar, .filter-row, .play-heading, .play-details, .button-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.eyebrow { margin: 0 0 9px; }
-h1, h2, p { margin-top: 0; }
-h1 { margin-bottom: 0; font-size: clamp(22px, 4vw, 34px); letter-spacing: -.04em; }
-.search-box { display: flex; align-items: center; gap: 8px; min-width: min(100%, 280px); padding: 12px 14px; border: 1px solid var(--line); background: var(--card); color: var(--muted); }
-.search-box input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--ink); }
-.filter-row { margin: 44px 0 18px; }
-.filter-group { display: flex; gap: 8px; flex-wrap: wrap; }
-.filter-chip, .button { border: 1px solid var(--line); cursor: pointer; transition: .18s ease; }
-.filter-chip { padding: 7px 14px; border-radius: 99px; color: var(--muted); background: transparent; font-size: 13px; }
-.filter-chip:hover, .filter-chip.is-active { color: var(--paper); border-color: var(--ink); background: var(--ink); }
-.result-count { margin: 0; color: var(--muted); font-size: 12px; }
-.game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
-.game-card { overflow: hidden; border: 1px solid var(--line); background: var(--card); transition: transform .15s ease, box-shadow .15s ease; }
-.game-card:hover { transform: translateY(-2px); box-shadow: 3px 3px 0 var(--ink); }
-.game-card__cover { width: 60px; height: 60px; margin: 10px auto 0; overflow: hidden; background: var(--cover); }
-.game-card__cover img { width: 60px; height: 60px; display: block; object-fit: cover; }
-.game-card__body { padding: 8px 10px 10px; }
-.game-card__body h2 { margin-bottom: 3px; font-size: 13px; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.game-card__body p { min-height: 16px; margin-bottom: 6px; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tag-row { display: flex; gap: 4px; min-height: 18px; overflow: hidden; }
-.tag-row span { padding: 2px 5px; color: var(--tag-text); background: var(--tag-bg); font-size: 10px; white-space: nowrap; }
-.empty-state { padding: 50px 0; color: var(--muted); text-align: center; }
-.backup-panel { display: flex; justify-content: space-between; gap: 24px; margin-top: 68px; padding: 26px; border: 1px solid var(--line); background: var(--panel); }
-.backup-panel h2, .play-details h2 { margin-bottom: 8px; font-size: 24px; letter-spacing: -.04em; }
-.backup-panel p:not(.eyebrow), .details-copy > p:not(.eyebrow) { max-width: 530px; margin-bottom: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
-.button { display: inline-flex; align-items: center; justify-content: center; padding: 10px 15px; color: var(--ink); background: transparent; font-size: 13px; white-space: nowrap; }
-.button:hover { transform: translateY(-1px); }
-.button--dark { color: white; border-color: var(--dark); background: var(--dark); }
-.button--light { background: var(--card); }
-.button--outline { color: inherit; border-color: currentColor; }
-.button--accent { color: white; border-color: var(--accent); background: var(--accent); }
-.status-text { min-height: 20px; margin: 12px 0 0; color: var(--success); font-size: 12px; }
-.status-text--error { color: var(--error); }
-.site-footer { display: flex; justify-content: space-between; padding: 20px 0 30px; color: var(--muted); font: 11px 'Space Mono', monospace; }
-.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
-.play-shell { padding: 52px 0 70px; }
-.play-heading { color: var(--ink); align-items: end; }
-.play-heading h1 { font-size: clamp(28px, 5vw, 46px); }
-.play-subtitle { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
-.player-frame { margin-top: 28px; padding: 12px; background: #0d0e11; box-shadow: 0 18px 50px rgba(0,0,0,.25); }
-.player-container { display: grid; place-items: center; width: min(100%, 960px); aspect-ratio: 4 / 3; margin: 0 auto; overflow: hidden; background: #050506; }
-.player-container ruffle-player { display: block; width: 100%; height: 100%; }
-.loading-state { display: flex; align-items: center; gap: 10px; color: #96959a; font-size: 13px; }
-.spinner { width: 14px; height: 14px; border: 2px solid #555; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.play-details { align-items: start; margin-top: 42px; padding-top: 25px; border-top: 1px solid var(--line); color: var(--ink); }
-.save-tools { min-width: 280px; }
-.save-tools .tool-label { margin-bottom: 12px; color: var(--muted); }
-@media (max-width: 700px) { .site-header__inner, .page-shell, .play-shell, .site-footer { width: min(100% - 24px, 1180px); } .site-header__inner { min-height: 66px; } .header-meta { gap: 10px; } .header-meta .text-link { display: none; } .page-shell, .play-shell { padding-top: 36px; } .toolbar, .play-heading, .play-details, .backup-panel { display: block; } .search-box { margin-top: 25px; } .filter-row { margin-top: 30px; } .backup-panel .button-row, .play-heading .button-row, .play-details .button-row { margin-top: 20px; justify-content: start; } .site-footer { display: block; line-height: 2; } .player-frame { margin-top: 20px; padding: 6px; } .player-container, .player-container ruffle-player { width: 100%; } }
+/* 游戏柜共享主题变量，供列表页与播放页使用。 */
+:root {
+  color-scheme: light dark;
+  --header: rgba(244, 239, 230, 0.92);
+  --cover: #ded6ca;
+  --tag-text: #a44b2e;
+  --tag-bg: #f8dfd3;
+  --panel: #ebe3d6;
+  --success: #4d795a;
+  --error: #b34e39;
+  --focus: #21874a;
+  --paper: #f4efe6;
+  --ink: #202228;
+  --muted: #77736c;
+  --line: #d9d1c3;
+  --accent: #0ec314;
+  --dark: #191b20;
+  --card: #fffdf9;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: 'Noto Sans SC', system-ui, sans-serif;
+}
+body[data-page='play'] {
+  color: var(--ink);
+  background: var(--paper);
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+.home-link {
+  font:
+    500 13px system-ui,
+    sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+button,
+input {
+  font: inherit;
+}
+/* 两种页面共用的导航与品牌区域。 */
+.site-header {
+  border-bottom: 1px solid var(--line);
+  background: var(--header);
+}
+.site-header--dark {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--header);
+}
+.site-header__inner,
+.page-shell,
+.play-shell,
+.site-footer {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+}
+.site-header__inner {
+  min-height: 78px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand__mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: white;
+  background: var(--accent);
+  font:
+    700 21px 'Space Mono',
+    monospace;
+}
+.brand strong,
+.brand small {
+  display: block;
+}
+.brand strong {
+  font-size: 16px;
+  letter-spacing: 0.04em;
+}
+.brand small,
+.header-meta,
+.eyebrow,
+.tool-label {
+  color: var(--muted);
+  font:
+    11px 'Space Mono',
+    monospace;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.brand--light small,
+.eyebrow--light {
+  color: var(--muted);
+}
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.text-link {
+  color: var(--accent);
+  font:
+    600 13px 'Noto Sans SC',
+    sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.page-shell {
+  padding: 62px 0 80px;
+}
+.toolbar,
+.filter-row,
+.play-heading,
+.play-details,
+.button-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.eyebrow {
+  margin: 0 0 9px;
+}
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(22px, 4vw, 34px);
+  letter-spacing: -0.04em;
+}
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: min(100%, 280px);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+}
+.search-box input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+}
+.filter-row {
+  margin: 44px 0 18px;
+}
+.filter-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.filter-chip,
+.button {
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+.filter-chip {
+  padding: 7px 14px;
+  border-radius: 99px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 13px;
+}
+.filter-chip:hover,
+.filter-chip.is-active {
+  color: var(--paper);
+  border-color: var(--ink);
+  background: var(--ink);
+}
+.result-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+/* 筛选结果的卡片网格，封面与标题保持统一尺寸。 */
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px;
+}
+.game-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--card);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.game-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.game-card__cover {
+  width: 60px;
+  height: 60px;
+  margin: 10px auto 0;
+  overflow: hidden;
+  background: var(--cover);
+}
+.game-card__cover img {
+  width: 60px;
+  height: 60px;
+  display: block;
+  object-fit: cover;
+}
+.game-card__body {
+  padding: 8px 10px 10px;
+}
+.game-card__body h2 {
+  margin-bottom: 3px;
+  font-size: 13px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.game-card__body p {
+  min-height: 16px;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tag-row {
+  display: flex;
+  gap: 4px;
+  min-height: 18px;
+  overflow: hidden;
+}
+.tag-row span {
+  padding: 2px 5px;
+  color: var(--tag-text);
+  background: var(--tag-bg);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.empty-state {
+  padding: 50px 0;
+  color: var(--muted);
+  text-align: center;
+}
+/* 本机存档导入导出入口及操作反馈。 */
+.backup-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 68px;
+  padding: 26px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.backup-panel h2,
+.play-details h2 {
+  margin-bottom: 8px;
+  font-size: 24px;
+  letter-spacing: -0.04em;
+}
+.backup-panel p:not(.eyebrow),
+.details-copy > p:not(.eyebrow) {
+  max-width: 530px;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 15px;
+  color: var(--ink);
+  background: transparent;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.button:hover {
+  transform: translateY(-1px);
+}
+.button--dark {
+  color: white;
+  border-color: var(--dark);
+  background: var(--dark);
+}
+.button--light {
+  background: var(--card);
+}
+.button--outline {
+  color: inherit;
+  border-color: currentColor;
+}
+.button--accent {
+  color: white;
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.status-text {
+  min-height: 20px;
+  margin: 12px 0 0;
+  color: var(--success);
+  font-size: 12px;
+}
+.status-text--error {
+  color: var(--error);
+}
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px 0 30px;
+  color: var(--muted);
+  font:
+    11px 'Space Mono',
+    monospace;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+/* 游戏播放页：标题、Ruffle 容器和游戏说明。 */
+.play-shell {
+  padding: 52px 0 70px;
+}
+.play-heading {
+  color: var(--ink);
+  align-items: end;
+}
+.play-heading h1 {
+  font-size: clamp(28px, 5vw, 46px);
+}
+.play-subtitle {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.player-frame {
+  margin-top: 28px;
+  padding: 12px;
+  background: #0d0e11;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+}
+.player-container {
+  display: grid;
+  place-items: center;
+  width: min(100%, 960px);
+  aspect-ratio: 4 / 3;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #050506;
+}
+.player-container ruffle-player {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #96959a;
+  font-size: 13px;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #555;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.play-details {
+  align-items: start;
+  margin-top: 42px;
+  padding-top: 25px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+}
+.save-tools {
+  min-width: 280px;
+}
+.save-tools .tool-label {
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+/* 窄屏下调整网格、工具栏和播放器，保留可操作的按钮尺寸。 */
+@media (max-width: 700px) {
+  .site-header__inner,
+  .page-shell,
+  .play-shell,
+  .site-footer {
+    width: min(100% - 24px, 1180px);
+  }
+  .site-header__inner {
+    min-height: 66px;
+  }
+  .header-meta {
+    gap: 10px;
+  }
+  .header-meta .text-link {
+    display: none;
+  }
+  .page-shell,
+  .play-shell {
+    padding-top: 36px;
+  }
+  .toolbar,
+  .play-heading,
+  .play-details,
+  .backup-panel {
+    display: block;
+  }
+  .search-box {
+    margin-top: 25px;
+  }
+  .filter-row {
+    margin-top: 30px;
+  }
+  .backup-panel .button-row,
+  .play-heading .button-row,
+  .play-details .button-row {
+    margin-top: 20px;
+    justify-content: start;
+  }
+  .site-footer {
+    display: block;
+    line-height: 2;
+  }
+  .player-frame {
+    margin-top: 20px;
+    padding: 6px;
+  }
+  .player-container,
+  .player-container ruffle-player {
+    width: 100%;
+  }
+}
 
+/* 跟随系统主题覆盖背景、边框和文本颜色。 */
 @media (prefers-color-scheme: dark) {
-  :root { --paper: #191b20; --ink: #f8f5ee; --muted: #b2afa8; --line: #494c55; --card: #24272e; --header: rgba(25,27,32,.92); --cover: #353942; --tag-text: #ffc2a6; --tag-bg: #503328; --panel: #292c33; --success: #9ac6a7; --error: #ffac98; --focus: #70d996; }
-  .button--dark { border-color: var(--line); background: var(--card); }
+  :root {
+    --paper: #191b20;
+    --ink: #f8f5ee;
+    --muted: #b2afa8;
+    --line: #494c55;
+    --card: #24272e;
+    --header: rgba(25, 27, 32, 0.92);
+    --cover: #353942;
+    --tag-text: #ffc2a6;
+    --tag-bg: #503328;
+    --panel: #292c33;
+    --success: #9ac6a7;
+    --error: #ffac98;
+    --focus: #70d996;
+  }
+  .button--dark {
+    border-color: var(--line);
+    background: var(--card);
+  }
 }

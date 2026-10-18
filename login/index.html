@@ -1,25 +1,38 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
-  <title>登录 · cloverfrog</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <main>
-    <a href="/">← cloverfrog</a>
-    <h1>登录</h1>
-    <p>登录后即可使用所有功能。</p>
-    <form id="login">
-      <label>邮箱<input id="identity" type="email" autocomplete="username" maxlength="254" required></label>
-      <label>密码<input id="password" type="password" autocomplete="current-password" maxlength="512" required></label>
-      <button type="submit" disabled>登录</button>
-    </form>
-    <p id="status" role="status" aria-live="polite">正在检查登录状态…</p>
-  </main>
-  <script type="module" src="login.mjs"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- 登录页只从本站加载脚本和提交表单，避免凭据流向额外来源。 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'"
+    />
+    <title>登录 · cloverfrog</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <a href="/">← cloverfrog</a>
+      <h1>登录</h1>
+      <p>登录后即可使用所有功能。</p>
+      <form id="login">
+        <label
+          >邮箱<input id="identity" type="email" autocomplete="username" maxlength="254" required
+        /></label>
+        <label
+          >密码<input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            maxlength="512"
+            required
+        /></label>
+        <button type="submit" disabled>登录</button>
+      </form>
+      <p id="status" role="status" aria-live="polite">正在检查登录状态…</p>
+    </main>
+    <script type="module" src="login.mjs"></script>
+  </body>
 </html>

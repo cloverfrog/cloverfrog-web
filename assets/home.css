@@ -1,20 +1,66 @@
-:root { color-scheme: light dark; --background: #fff; --text: #222; --link: #2459a6; --link-hover: #163d77; }
-* { box-sizing: border-box; }
+/* 首页基础色彩与导航排版。 */
+:root {
+  color-scheme: light dark;
+  --background: #fff;
+  --text: #222;
+  --link: #2459a6;
+  --link-hover: #163d77;
+}
+* {
+  box-sizing: border-box;
+}
 body {
   margin: 0;
   background: var(--background);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Microsoft YaHei',
+    sans-serif;
   line-height: 1.6;
 }
-main { width: min(100%, 640px); margin: 64px auto; padding: 0 24px; }
-h1 { margin: 0 0 24px; font-size: 24px; font-weight: 600; }
-ul { margin: 0; padding: 0; list-style: none; }
-a { display: inline-block; padding: 8px 0; color: var(--link); text-underline-offset: 4px; }
-a:hover { color: var(--link-hover); }
-a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
-@media (max-width: 480px) { main { margin: 32px auto; } }
+main {
+  width: min(100%, 640px);
+  margin: 64px auto;
+  padding: 0 24px;
+}
+h1 {
+  margin: 0 0 24px;
+  font-size: 24px;
+  font-weight: 600;
+}
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+a {
+  display: inline-block;
+  padding: 8px 0;
+  color: var(--link);
+  text-underline-offset: 4px;
+}
+a:hover {
+  color: var(--link-hover);
+}
+a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+/* 窄屏缩小页边距，保留手机上的可用阅读宽度。 */
+@media (max-width: 480px) {
+  main {
+    margin: 32px auto;
+  }
+}
 
+/* 跟随系统深色模式切换颜色，不改变导航结构。 */
 @media (prefers-color-scheme: dark) {
-  :root { --background: #181b20; --text: #e7eaf0; --link: #91bcff; --link-hover: #bdd7ff; }
+  :root {
+    --background: #181b20;
+    --text: #e7eaf0;
+    --link: #91bcff;
+    --link-hover: #bdd7ff;
+  }
 }

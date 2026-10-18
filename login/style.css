@@ -1,14 +1,62 @@
-:root { color-scheme: light dark; font-family: system-ui, -apple-system, "Microsoft YaHei", sans-serif; }
-* { box-sizing: border-box; }
-body { margin: 0; }
-main { max-width: 420px; margin: 12vh auto; padding: 24px; }
-a { color: light-dark(#2459a6, #9bc4ff); text-underline-offset: 4px; }
-h1 { margin: 28px 0 12px; }
-p { line-height: 1.6; }
-label { display: block; margin: 20px 0; }
-input, button { font: inherit; border: 1px solid light-dark(#ccd3db, #536071); border-radius: 6px; padding: 12px; }
-input { display: block; width: 100%; margin-top: 8px; }
-button { width: 100%; cursor: pointer; }
-button:disabled { opacity: .5; cursor: default; }
-:focus-visible { outline: 2px solid #4d8be3; outline-offset: 3px; }
-#status { min-height: 1.6em; }
+/* 统一登录页的单列表单、输入反馈与键盘焦点样式。 */
+:root {
+  color-scheme: light dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Microsoft YaHei',
+    sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 420px;
+  margin: 12vh auto;
+  padding: 24px;
+}
+a {
+  color: light-dark(#2459a6, #9bc4ff);
+  text-underline-offset: 4px;
+}
+h1 {
+  margin: 28px 0 12px;
+}
+p {
+  line-height: 1.6;
+}
+label {
+  display: block;
+  margin: 20px 0;
+}
+input,
+button {
+  font: inherit;
+  border: 1px solid light-dark(#ccd3db, #536071);
+  border-radius: 6px;
+  padding: 12px;
+}
+input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+button {
+  width: 100%;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+:focus-visible {
+  outline: 2px solid #4d8be3;
+  outline-offset: 3px;
+}
+/* 登录进度和错误反馈，预留高度以减少提示变化时的布局跳动。 */
+#status {
+  min-height: 1.6em;
+}
