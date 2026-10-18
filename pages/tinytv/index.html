@@ -7,16 +7,14 @@
 <main>
   <header><a href="../../">cloverfrog</a><h1>TinyTV</h1><span>LIVE · TINY</span></header>
   <section id="player" aria-label="频道播放器" tabindex="0">
-    <video id="video" playsinline preload="metadata" disablepictureinpicture disableremoteplayback></video>
+    <div id="video" aria-label="频道画面"></div>
     <div class="entry"><button id="enter" disabled><span aria-hidden="true">▶</span> <span id="enter-label">进入频道</span></button></div>
-    <div class="bar">
-      <span id="status" role="status">正在连接频道…</span>
-      <button id="fullscreen" aria-label="全屏" title="全屏" aria-pressed="false">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/></svg>
-      </button>
-    </div>
+    <span id="status" role="status" hidden></span>
+    <button id="fullscreen" aria-label="全屏" title="全屏" aria-pressed="false">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/></svg>
+    </button>
   </section>
   <h2 id="current">等待节目</h2><p id="next"></p>
-  <details><summary>循环节目单</summary><ol id="programs"></ol></details>
+  <details><summary>节目单</summary><ol id="programs"></ol></details>
 </main><script type="module" src="player.js"></script>
 </html>

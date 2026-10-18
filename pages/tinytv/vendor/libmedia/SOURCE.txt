@@ -1,0 +1,6 @@
+libmedia AVPlayer 1.3.1
+Copyright (C) Gaoxing Zhao and contributors
+License: LGPL-3.0-or-later; see COPYING.LGPLv3
+Unmodified upstream JS/WASM binaries; TinyTV integration is separate.
+Source: https://github.com/zhaohappy/libmedia/tree/152f629d3021fd8013efa464fcb7b55f9fbe7753
+Source archive: https://github.com/zhaohappy/libmedia/archive/152f629d3021fd8013efa464fcb7b55f9fbe7753.tar.gz

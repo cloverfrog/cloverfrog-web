@@ -1,7 +1,8 @@
 import { API_URL } from '/config.js';
 import { requireUser, goToLogin } from '/assets/auth.mjs';
+import { TinyTVPlayback } from './playback.js';
 
-const video = document.querySelector('#video');
+const video = new TinyTVPlayback(document.querySelector('#video'));
 const status = document.querySelector('#status');
 const player = document.querySelector('#player');
 const enter = document.querySelector('#enter');
@@ -10,7 +11,8 @@ const enterLabel = document.querySelector('#enter-label');
 const fullscreen = document.querySelector('#fullscreen');
 let hideControls, needsAttention = false, playbackIssue = '';
 function setStatus(message, attention = false) {
-  status.textContent = message;
+  status.textContent = attention ? message : '';
+  status.hidden = !attention || !message;
   needsAttention = attention;
   if (attention) revealControls();
 }
@@ -38,7 +40,7 @@ function setAuthenticated(value) {
   if (!value) {
     started = false; current = null; pending = null;
     clearTimeout(boundary);
-    video.pause(); video.removeAttribute('src'); video.load();
+    video.clear().catch(() => {});
     document.querySelector('#current').textContent = '登录后进入频道';
     document.querySelector('#next').textContent = '';
     document.querySelector('#programs').replaceChildren();
@@ -58,7 +60,7 @@ function applyPosition() {
     setStatus('视频已结束，等待节目时间线切换；请核对节目时长。', true);
     return;
   }
-  if (Math.abs(video.currentTime - target) > 30) video.currentTime = target;
+  if (Math.abs(video.currentTime - target) > 30) video.seek(target).catch(() => {});
   pending = null;
   if (started && video.paused) playChannel();
 }
@@ -75,7 +77,7 @@ async function sync() {
     const received = performance.now();
     clearTimeout(boundary);
     if (data.status === 'waiting') {
-      video.pause(); current = null; pending = null;
+      video.pause().catch(() => {}); current = null; pending = null;
       setStatus(`频道将于 ${new Date(data.startTime * 1000).toLocaleString()} 开播`, true);
       boundary = setTimeout(sync, Math.min(30000, Math.max(100, (data.startTime-data.serverTime)*1000)));
       return;
@@ -84,19 +86,23 @@ async function sync() {
     pending = {offset:data.offset + delay, received};
     if (current !== identity(data)) {
       current = identity(data);
-      video.src = data.playUrl;
-      video.load();
+      video.load(data.playUrl).catch(() => {});
     }
     document.querySelector('#current').textContent = label(data);
     document.querySelector('#next').textContent = `接下来：${label(data.next)}`;
-    document.querySelector('#programs').replaceChildren(...data.programs.map(p => {
+    const position = data.programs.findIndex(p => p.title === data.title && p.season === data.season && p.episode === data.episode);
+    const upcoming = position < 0 ? [data, data.next] : Array.from(
+      {length: Math.min(11, data.programs.length)},
+      (_, index) => data.programs[(position + index) % data.programs.length]
+    );
+    document.querySelector('#programs').replaceChildren(...upcoming.map((p, index) => {
       const li = document.createElement('li');
-      li.textContent = `${label(p)} · ${p.duration.toFixed(2)} 秒`;
-      li.classList.toggle('active', p.title === data.title && p.season === data.season && p.episode === data.episode);
+      li.textContent = `${index === 0 ? '正在播放：' : ''}${label(p)} · ${p.duration.toFixed(2)} 秒`;
+      li.classList.toggle('active', index === 0);
       return li;
     }));
     if (playbackIssue) setStatus(playbackIssue, true);
-    else setStatus(started ? (video.readyState < 3 ? '正在缓冲…' : '正在直播 · 已同步频道时间') : '频道已就绪，点击进入频道', started && video.readyState < 3);
+    else setStatus('正在缓冲…', started && video.readyState < 3);
     applyPosition();
     boundary = setTimeout(sync, Math.max(100, (data.remaining-delay)*1000+50));
   } catch (error) {
@@ -109,7 +115,7 @@ video.addEventListener('play', () => { started = true; sync(); });
 video.addEventListener('playing', () => {
   playbackIssue = '';
   entry.hidden = true;
-  setStatus('正在直播 · 已同步频道时间');
+  setStatus('');
   revealControls();
 });
 video.addEventListener('waiting', () => {
@@ -119,11 +125,15 @@ video.addEventListener('pause', revealControls);
 video.addEventListener('error', () => {
   if (authenticated) {
     current = null;
-    offerEntry('视频加载失败，正在重试；也可能是当前浏览器不支持视频编码。');
+    offerEntry(video.error?.message || '视频加载失败，请重新进入频道。');
   }
+});
+video.addEventListener('resume', () => {
+  if (authenticated && started) offerEntry('声音播放被浏览器暂停，请点击重新进入频道。');
 });
 
 enter.onclick = () => {
+  video.unlock();
   playbackIssue = '';
   started = true;
   setStatus('正在进入频道…', true);
@@ -175,3 +185,4 @@ setAuthenticated(false);
 requireUser()
   .then(user => { if (user) { setAuthenticated(true); sync(); } })
   .catch(() => { setStatus('无法连接登录服务，请稍后刷新。', true); });
+window.addEventListener('pagehide', () => { video.clear().catch(() => {}); });
