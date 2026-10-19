@@ -16,7 +16,7 @@
 
 ## 开发与依赖
 
-`player.js` 负责频道时间校准和全屏交互，`playback.js` 封装 AVPlayer 的加载、定位、播放事件和资源释放，`style.css` 维护本模块样式。页面调用同源 `/api/tinytv/*` 查询节目和获取直链，查询请求携带同源登录 Cookie。AVPlayer 随后直接从返回的媒体地址读取视频，使用 `credentials: omit` 和 `no-referrer`，不通过本站后端中转。直链只在当前播放器实例中使用，不持久化；片源 CORS、Range 与直链有效期要求见后端模块文档。进入频道和切集时先定位再播放；播放中的同步查询间隔和进度偏差阈值分别为 15 秒、30 秒。
+`player.js` 负责频道时间校准和全屏交互，`playback.js` 封装 AVPlayer 的加载、定位、播放事件和资源释放，`style.css` 维护本模块样式。页面通过同源 `/api/tinytv/channels/tiny/now` 认证查询节目，响应的 `playUrl` 直接为 AList `/d/...` 地址。AVPlayer 使用该地址读取视频并跟随 AList 的下载重定向，使用 `credentials: omit` 和 `no-referrer`，不经过额外的直链查询接口或本站视频中转。地址不持久化；片源 CORS、Range 与地址权限要求见后端模块文档。进入频道和切集时先定位再播放；播放中的同步查询间隔和进度偏差阈值分别为 15 秒、30 秒。
 
 ## 播放器资源
 

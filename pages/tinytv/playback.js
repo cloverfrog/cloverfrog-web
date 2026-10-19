@@ -97,21 +97,8 @@ export class TinyTVPlayback extends EventTarget {
       if (!source) return;
       const AVPlayer = await loadLibrary();
       if (generation !== this.generation) return;
-      // Only the address lookup uses the website session. Video bytes are read
-      // directly from the returned source, without forwarding login credentials.
-      const response = await fetch(new URL(source, location.href).href, {
-        credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(15000)
-      });
-      if (generation !== this.generation) return;
-      if (response.status === 401) {
-        this.emit('authrequired');
-        return;
-      }
-      if (!response.ok) throw new Error(`获取播放地址失败：${response.status}`);
-      const {url} = await response.json();
-      const mediaUrl = new URL(url);
+      const mediaUrl = new URL(source, location.href);
       if (!['https:', 'http:'].includes(mediaUrl.protocol)) throw new Error('无效的播放地址');
-      if (generation !== this.generation) return;
       const engine = new AVPlayer({
         container: this.container,
         // 使用非 MSE 播放路径，优先硬解；不支持的编码由随模块准备的 WASM 解码器处理。

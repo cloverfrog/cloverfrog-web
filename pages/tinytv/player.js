@@ -220,10 +220,6 @@ async function sync() {
 // playing 表示实际开始播放，此时才申请常亮；waiting 只是缓冲，不释放已有常亮锁。
 // pause / ended / error 都停止常亮；ended 还会立即查询时间线，尝试接入下一节目。
 video.addEventListener('loadedmetadata', applyPosition);
-video.addEventListener('authrequired', () => {
-  setAuthenticated(false);
-  goToLogin();
-});
 video.addEventListener('ended', () => {
   setScreenAwake(false);
   sync();
