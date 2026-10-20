@@ -115,13 +115,13 @@ def build_records(config, files):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, default=Path('data/tinytv/sources_config.json'))
-    parser.add_argument('--output', type=Path, default=Path('data/tinytv/sources_new.json'))
+    parser.add_argument('--config', type=Path, default=Path('backend/data/tinytv/sources_config.json'))
+    parser.add_argument('--output', type=Path, default=Path('backend/data/tinytv/sources_new.json'))
     parser.add_argument('--dry-run', action='store_true', help='只匹配文件，不写 JSON')
     args = parser.parse_args(argv)
     try:
         config = json.loads(args.config.read_text(encoding='utf-8-sig'))
-        env = dotenv_values('.env')
+        env = dotenv_values('backend/.env')
         base_url = os.getenv('ALIST_URL') or env.get('ALIST_URL') or 'https://alist.cloverfrog.xyz'
         root = os.getenv('ALIST_ROOT', env.get('ALIST_ROOT') or '')
         parsed = urlsplit(base_url)

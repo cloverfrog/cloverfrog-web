@@ -90,8 +90,8 @@ def generate(sources, *, min_run=2, max_run=3, balance_alpha=0.6, seed=None):
 # 命令行负责读取资源和写节目表；带时区的 startTime 是后端计算所有观众播放位置的共同起点。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sources", type=Path, default=Path("data/tinytv/sources.json"))
-    parser.add_argument("--output", type=Path, default=Path("data/tinytv/schedule.json"))
+    parser.add_argument("--sources", type=Path, default=Path("backend/data/tinytv/sources.json"))
+    parser.add_argument("--output", type=Path, default=Path("backend/data/tinytv/schedule.json"))
     parser.add_argument("--channel", default="tiny")
     parser.add_argument("--min-run", type=int, default=2, help="每次最少连播几集，默认 2")
     parser.add_argument("--max-run", type=int, default=3, help="每次最多连播几集，默认 3")

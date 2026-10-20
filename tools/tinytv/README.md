@@ -2,10 +2,10 @@
 
 ## build_sources.py — 从 AList 生成片源清单
 
-脚本从项目根目录 `.env` 读取 `ALIST_URL` 和 `ALIST_ROOT`，通过 AList `/api/fs/list` 递归枚举媒体文件，再按各季的 `pattern` 匹配分集。目录接口需要认证时，可配置 `ALIST_TOKEN`，或同时配置 `ALIST_USERNAME`、`ALIST_PASSWORD`；账号密码仅用于登录并获取本次运行的临时 token。
+脚本从 `backend/.env` 读取 `ALIST_URL` 和 `ALIST_ROOT`，通过 AList `/api/fs/list` 递归枚举媒体文件，再按各季的 `pattern` 匹配分集。目录接口需要认证时，可配置 `ALIST_TOKEN`，或同时配置 `ALIST_USERNAME`、`ALIST_PASSWORD`；账号密码仅用于登录并获取本次运行的临时 token。
 
 ```bash
-python tools/tinytv/build_sources.py --config sources_config.json --output data/tinytv/sources.json
+python tools/tinytv/build_sources.py --config sources_config.json --output backend/data/tinytv/sources.json
 ```
 
 输出只包含 `title`、`season`、`episode` 和相对于 `ALIST_ROOT` 的 `path`，不探测 `duration`。生成后再运行 `probe_durations.py`；它会跳过已有有效时长，并从既有输出恢复路径未变化的记录。
@@ -22,13 +22,13 @@ python tools/tinytv/probe_durations.py --limit 3
 python tools/tinytv/probe_durations.py
 ```
 
-读取 `.env` 的 `ALIST_URL`、`ALIST_ROOT`，通过 `/d/` 直链采集。命令行参数优先于环境变量，环境变量优先于 `.env`。
+读取 `backend/.env` 的 `ALIST_URL`、`ALIST_ROOT`，通过 `/d/` 直链采集。命令行参数优先于环境变量，环境变量优先于 `backend/.env`。
 
 | 文件 | 用途 |
 | --- | --- |
-| `data/tinytv/sources.json` | 输入，保持原样 |
-| `data/tinytv/sources.probed.json` | 输出，补充数值型 `duration`，单位为秒 |
-| `data/tinytv/sources.probed.errors.json` | 本次运行的失败记录 |
+| `backend/data/tinytv/sources.json` | 输入，保持原样 |
+| `backend/data/tinytv/sources.probed.json` | 输出，补充数值型 `duration`，单位为秒 |
+| `backend/data/tinytv/sources.probed.errors.json` | 本次运行的失败记录 |
 
 每处理一条保存一次结果。重复运行相同命令会跳过已有有效时长，并从输出文件恢复同一分集、同一路径的采集结果；失败项会重试。中断后也可直接重跑。
 
@@ -63,5 +63,5 @@ python generate_schedule.py --min-run 2 --max-run 3
 在已经配置了 `~/.ssh/config` 的情况下，使用 `scp` 上传数据文件到服务器：
 
 ```bash
-scp data/tinytv/media.json data/tinytv/sources.json data/tinytv/schedule.json aliyun:/srv/backend/data/tinytv
+scp backend/data/tinytv/media.json backend/data/tinytv/sources.json backend/data/tinytv/schedule.json aliyun:/srv/backend/backend/data/tinytv
 ```

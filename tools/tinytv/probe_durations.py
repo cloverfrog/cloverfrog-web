@@ -113,8 +113,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description='Collect source durations, preserving the input and resuming completed work.'
     )
-    parser.add_argument('--input', type=Path, default=Path('data/tinytv/sources.json'))
-    parser.add_argument('--output', type=Path, default=Path('data/tinytv/sources.probed.json'))
+    parser.add_argument('--input', type=Path, default=Path('backend/data/tinytv/sources.json'))
+    parser.add_argument('--output', type=Path, default=Path('backend/data/tinytv/sources.probed.json'))
     parser.add_argument('--base-url', help='AList origin; defaults to ALIST_URL in environment/.env')
     parser.add_argument('--root', help='AList mount prefix; defaults to ALIST_ROOT in environment/.env')
     parser.add_argument('--timeout', type=float, default=60, help='Maximum seconds per file (default: 60)')
@@ -128,7 +128,7 @@ def main(argv=None):
     if not shutil.which(args.ffprobe):
         parser.error('ffprobe not found; install FFmpeg or pass --ffprobe')
     # 命令行参数优先，其次为进程环境和 .env；支持临时指定资源入口而不改部署配置。
-    env = dotenv_values('.env')
+    env = dotenv_values('backend/.env')
     base = args.base_url or os.getenv('ALIST_URL') or env.get('ALIST_URL') or 'https://alist.cloverfrog.xyz'
     root = args.root if args.root is not None else os.getenv('ALIST_ROOT', env.get('ALIST_ROOT') or '')
     if urlsplit(base).scheme not in ('http', 'https') or not urlsplit(base).netloc:
