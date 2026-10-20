@@ -12,7 +12,7 @@
 
 ## 项目约束
 
-- `pages/` 下每个目录都是独立业务模块，代码、样式和资源尽量自包含。
+- `frontend/pages/` 下每个目录都是独立业务模块，代码、样式和资源尽量自包含。
 - 业务模块之间不得直接引用对方的代码、配置或内部数据。
 - 认证等公共基础服务放在业务模块目录外，模块通过明确的公共接口使用。
 - 公共服务不应包含业务模块的专属配置、逻辑或名称；应用入口可以组装各模块。
@@ -37,7 +37,7 @@
 - 前端负责页面交互，后端负责需要凭据或权限校验的服务端操作。
 - 登录统一使用公共认证，不在业务模块中另建登录框或保存登录 token。
 - 受保护的业务请求通过同源 `/api/*` 访问对应后端模块。
-- 后端项目为 `../cloverfrog.github.io-backend`，修改时遵守该项目自己的约束。
+- 后端项目位于本仓库 `backend/`，修改时遵守后端模块自己的约束。
 - PocketBase 集合字段和权限规则归对应后端模块维护文档。
 
 ## 资源
@@ -77,7 +77,7 @@ ssh aliyun
 线上主要目录：
 
 ```text
-/srv/web        # 网站 Git 工作目录
+/srv/cloverfrog  # 网站 Monorepo（frontend/ 和 backend/）
 /srv/resources  # 不进入 Git 的大文件资源
 ```
 
@@ -87,8 +87,8 @@ ssh aliyun
 https://cloverfrog.xyz
 ```
 
-Caddy 当前负责：
-- `/srv/web` 的静态网站服务；
+迁移后 Caddy 应负责（服务器切换前以线上实际配置为准）：
+- `/srv/cloverfrog/frontend` 的静态网站服务；
 - `/resources/*` → `/srv/resources/`；
 - `pocketbase.cloverfrog.xyz` → `127.0.0.1:8090`；
 - 其他独立服务的反向代理。
