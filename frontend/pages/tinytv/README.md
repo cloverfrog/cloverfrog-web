@@ -1,6 +1,6 @@
 # TinyTV
 
-访问 `/pages/tinytv/`，观看按固定时间线循环播放的频道。依赖[网站公共认证](../../login/README.md)和[TinyTV 后端](https://github.com/cloverfrog/cloverfrog.github.io-backend/blob/main/modules/tinytv/README.md)。
+访问 `/pages/tinytv/`，观看按固定时间线循环播放的频道。依赖[网站公共认证](../../login/README.md)和[TinyTV 后端](/backend/modules/tinytv/README.md)。
 
 ## 使用
 

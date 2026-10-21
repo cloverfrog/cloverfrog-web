@@ -18,6 +18,44 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
+def source_duration(item, key):
+    """Return one logical episode's duration for either supported source shape."""
+    if "parts" in item:
+        if "path" in item or "duration" in item:
+            raise ValueError(f"多文件资源不能同时定义 path 或 duration：{key}")
+        parts = item["parts"]
+        if not isinstance(parts, list) or not parts:
+            raise ValueError(f"parts 不能为空：{key}")
+        paths = [part.get("path") for part in parts if isinstance(part, dict)]
+        if (
+            len(paths) != len(parts)
+            or not all(isinstance(path, str) and path for path in paths)
+            or len(set(paths)) != len(paths)
+        ):
+            raise ValueError(f"part path 无效或重复：{key}")
+        durations = [part.get("duration") for part in parts if isinstance(part, dict)]
+        if len(durations) != len(parts) or not all(
+            not isinstance(value, bool)
+            and isinstance(value, (int, float))
+            and math.isfinite(value)
+            and value > 0
+            for value in durations
+        ):
+            raise ValueError(f"缺少有效 part duration：{key}")
+        return sum(durations)
+    if not isinstance(item.get("path"), str) or not item["path"]:
+        raise ValueError(f"缺少有效 path：{key}")
+    duration = item.get("duration")
+    if (
+        isinstance(duration, bool)
+        or not isinstance(duration, (int, float))
+        or not math.isfinite(duration)
+        or duration <= 0
+    ):
+        raise ValueError(f"缺少有效 duration：{key}")
+    return duration
+
+
 # 返回节目列表与总秒数；使用资源中的真实时长，编排结果可由 seed 重现。
 def generate(sources, *, min_run=2, max_run=3, balance_alpha=0.6, seed=None):
     if min_run < 1 or max_run < min_run:
@@ -34,15 +72,7 @@ def generate(sources, *, min_run=2, max_run=3, balance_alpha=0.6, seed=None):
         if key in seen:
             raise ValueError(f"重复资源：{key}")
         seen.add(key)
-        duration = item.get("duration")
-        if (
-            isinstance(duration, bool)
-            or not isinstance(duration, (int, float))
-            or not math.isfinite(duration)
-            or duration <= 0
-        ):
-            raise ValueError(f"缺少有效 duration：{key}")
-        grouped[title].append(item)
+        grouped[title].append({**item, "_duration": source_duration(item, key)})
 
     if not grouped:
         raise ValueError("sources.json 中没有视频")
@@ -78,9 +108,9 @@ def generate(sources, *, min_run=2, max_run=3, balance_alpha=0.6, seed=None):
                 "title": title,
                 "season": int(item["season"]),
                 "episode": int(item["episode"]),
-                "duration": item["duration"],
+                "duration": item["_duration"],
             })
-            total_seconds += item["duration"]
+            total_seconds += item["_duration"]
             positions[title] += 1
         previous = title
 

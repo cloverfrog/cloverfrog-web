@@ -70,6 +70,63 @@ class TimelineTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.locate(0)
 
+    def test_multipart_source_uses_logical_and_file_boundaries(self):
+        schedule = {
+            'channel': 'tiny',
+            'startTime': '2026-01-01T00:00:00+00:00',
+            'programs': [
+                {'title': 'show', 'season': 1, 'episode': 1},
+                {'title': 'show', 'season': 1, 'episode': 2},
+            ],
+        }
+        sources = [
+            {'title': 'show', 'season': 1, 'episode': 1, 'parts': [
+                {'path': '/a.mp4', 'duration': 10},
+                {'path': '/b.mp4', 'duration': 20},
+            ]},
+            {'title': 'show', 'season': 1, 'episode': 2, 'path': '/c.mp4', 'duration': 5},
+        ]
+        start = datetime.fromisoformat(schedule['startTime']).timestamp()
+
+        first = timeline(schedule, sources, start + 9.5)
+        self.assertEqual((first['path'], first['partIndex'], first['partCount']), ('/a.mp4', 1, 2))
+        self.assertAlmostEqual(first['offset'], 9.5)
+        self.assertAlmostEqual(first['remaining'], .5)
+        self.assertAlmostEqual(first['programRemaining'], 20.5)
+
+        second = timeline(schedule, sources, start + 10)
+        self.assertEqual((second['path'], second['partIndex']), ('/b.mp4', 2))
+        self.assertEqual(second['offset'], 0)
+        self.assertEqual(second['programStart'], start)
+        self.assertEqual(second['programEnd'], start + 30)
+        self.assertEqual(second['duration'], 30)
+        self.assertEqual(second['programs'][0]['duration'], 30)
+
+        next_episode = timeline(schedule, sources, start + 30)
+        self.assertEqual(next_episode['episode'], 2)
+        self.assertEqual(next_episode['partIndex'], 1)
+
+        looped = timeline(schedule, sources, start + 35)
+        self.assertEqual((looped['episode'], looped['path'], looped['offset']), (1, '/a.mp4', 0))
+
+    def test_rejects_invalid_multipart_source(self):
+        schedule = {
+            'channel': 'tiny',
+            'startTime': '2026-01-01T00:00:00+00:00',
+            'programs': [{'title': 'show', 'season': 1, 'episode': 1}],
+        }
+        source = {'title': 'show', 'season': 1, 'episode': 1}
+        start = datetime.fromisoformat(schedule['startTime']).timestamp()
+        for parts in (
+            [],
+            [{'duration': 1}],
+            [{'path': '/a.mp4', 'duration': 1}, {'path': '/b.mp4', 'duration': 0}],
+        ):
+            with self.subTest(parts=parts):
+                source['parts'] = parts
+                with self.assertRaises(ValueError):
+                    timeline(schedule, [source], start)
+
 
 if __name__ == '__main__':
     unittest.main()

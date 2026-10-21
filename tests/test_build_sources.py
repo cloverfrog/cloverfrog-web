@@ -63,6 +63,36 @@ class BuildSourcesTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'JSON array'):
             tool.build_records({'shows': []}, [])
 
+    def test_builds_explicit_multipart_episode(self):
+        config = [{'title': 'Show', 'seasons': [{
+            'season': 1,
+            'episodes': 2,
+            'pattern': 'Show/S{season:02d}E{episode:02d}.mp4',
+            'episodeParts': {
+                '2': [
+                    'Show/S{season:02d}E{episode:02d}a.mp4',
+                    'Show/S{season:02d}E{episode:02d}b.mp4',
+                ]
+            },
+        }]}]
+        records, errors = tool.build_records(config, [
+            'Show/S01E01.mp4', 'Show/S01E02a.mp4', 'Show/S01E02b.mp4'
+        ])
+        self.assertFalse(errors)
+        self.assertEqual(records[1]['parts'], [
+            {'path': '/Show/S01E02a.mp4'}, {'path': '/Show/S01E02b.mp4'}
+        ])
+        self.assertNotIn('path', records[1])
+
+    def test_multipart_patterns_must_each_match_one_distinct_file(self):
+        config = [{'title': 'Show', 'seasons': [{
+            'season': 1, 'episodes': 1, 'pattern': 'unused',
+            'episodeParts': {'1': ['Show/*.mp4', 'Show/missing.mp4']},
+        }]}]
+        records, errors = tool.build_records(config, ['Show/a.mp4', 'Show/b.mp4'])
+        self.assertFalse(records)
+        self.assertEqual(len(errors), 2)
+
 
 if __name__ == '__main__':
     unittest.main()
