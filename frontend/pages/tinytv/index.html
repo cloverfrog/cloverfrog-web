@@ -2,6 +2,7 @@
 <html lang="zh-CN">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="referrer" content="no-referrer" />
   <title>TinyTV · 固定频道</title>
   <link rel="stylesheet" href="style.css" />
   <main>
@@ -10,9 +11,15 @@
       <h1>TinyTV</h1>
       <span>LIVE · TINY</span>
     </header>
-    <!-- 视频由播放适配层挂载；进入按钮、提示和全屏按钮作为覆盖层由 player.js 控制。 -->
+    <!-- 原生视频、进入按钮、提示和播放控制由 player.js 协调。 -->
     <section id="player" aria-label="频道播放器" tabindex="0">
-      <div id="video" aria-label="频道画面"></div>
+      <video
+        id="video"
+        aria-label="频道画面"
+        crossorigin="anonymous"
+        playsinline
+        preload="auto"
+      ></video>
       <div class="entry">
         <button id="enter" disabled>
           <span aria-hidden="true">▶</span> <span id="enter-label">进入频道</span>
@@ -37,6 +44,38 @@
           <button type="button" data-program-end>当前节目结束后</button>
           <button type="button" data-cancel hidden>取消定时</button>
         </div>
+        <button id="picture-in-picture" aria-label="小窗播放" title="小窗播放">
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <rect x="3" y="5" width="18" height="14" rx="1" />
+            <rect x="12" y="11" width="7" height="5" rx="1" fill="currentColor" />
+          </svg>
+        </button>
+        <button
+          id="page-fullscreen"
+          aria-label="网页全屏"
+          title="网页全屏"
+          aria-pressed="false"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
+          </svg>
+        </button>
         <button id="fullscreen" aria-label="全屏" title="全屏" aria-pressed="false">
           <svg
             viewBox="0 0 24 24"

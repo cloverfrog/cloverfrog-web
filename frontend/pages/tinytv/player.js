@@ -1,12 +1,11 @@
 import { API_URL } from '/config.js';
 import { requireUser, goToLogin } from '/assets/auth.mjs';
-import { TinyTVPlayback } from './playback.js';
 
 // 频道页面入口：查询当前节目并校准播放进度，管理播放提示、屏幕常亮和全屏交互。
-// AVPlayer 的加载、解码、定位与操作排队由 playback.js 负责。
+// 片源由浏览器原生 video 播放，需使用浏览器支持的封装和音视频编码。
 
 // 页面元素与提示状态。
-const video = new TinyTVPlayback(document.querySelector('#video'));
+const video = document.querySelector('#video');
 const status = document.querySelector('#status');
 const player = document.querySelector('#player');
 const enter = document.querySelector('#enter');
@@ -14,6 +13,8 @@ const entry = document.querySelector('.entry');
 const enterLabel = document.querySelector('#enter-label');
 const fullscreen = document.querySelector('#fullscreen');
 const controls = document.querySelector('#controls');
+const pictureInPicture = document.querySelector('#picture-in-picture');
+const pageFullscreen = document.querySelector('#page-fullscreen');
 const sleepTimerButton = document.querySelector('#sleep-timer');
 const sleepTimerLabel = document.querySelector('#sleep-timer-label');
 const sleepTimerMenu = document.querySelector('#sleep-timer-menu');
@@ -76,7 +77,7 @@ function stopForSleepTimer() {
   clearSleepTimer();
   started = false;
   setScreenAwake(false);
-  video.pause().catch(() => {});
+  video.pause();
   offerEntry('定时关闭已停止播放。');
 }
 
@@ -160,6 +161,18 @@ function playChannel() {
   });
 }
 
+function loadVideo(source) {
+  video.pause();
+  video.src = new URL(source, location.href).href;
+  video.load();
+}
+
+function clearVideo() {
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+}
+
 // 登录失效时清空节目与播放资源，同时停止常亮，避免登录页仍占用播放器状态。
 let authenticated = false;
 // 清除旧版本地预览留下的直连片源设置，当前片源统一由后端提供。
@@ -168,7 +181,8 @@ try {
 } catch {}
 function setAuthenticated(value) {
   authenticated = value;
-  enter.disabled = !value;
+  // 登录成功后仍需等节目地址写入原生 video，避免用户点击时还没有可播放的媒体。
+  enter.disabled = true;
   if (!value) {
     clearSleepTimer();
     setScreenAwake(false);
@@ -178,7 +192,7 @@ function setAuthenticated(value) {
     pending = null;
     needsEntryPosition = false;
     clearTimeout(boundary);
-    video.clear().catch(() => {});
+    clearVideo();
     document.querySelector('#current').textContent = '登录后进入频道';
     document.querySelector('#next').textContent = '';
     document.querySelector('#programs').replaceChildren();
@@ -210,9 +224,15 @@ function applyPosition() {
     setStatus('视频已结束，等待节目时间线切换；请核对节目时长。', true);
     return;
   }
-  // 适配器会按顺序执行 seek 和 play，确保先定位再出画面，避免从片头闪播。
-  if (needsEntryPosition || Math.abs(video.currentTime - target) > 30)
-    video.seek(target).catch(() => {});
+  // 元数据就绪后先定位再播放，避免从片头闪播。
+  if (needsEntryPosition || Math.abs(video.currentTime - target) > 30) {
+    try {
+      video.currentTime = target;
+    } catch {
+      setStatus('无法定位到频道当前进度，请重新进入频道。', true);
+      return;
+    }
+  }
   needsEntryPosition = false;
   pending = null;
   if (started && video.paused) playChannel();
@@ -239,7 +259,7 @@ async function sync() {
     const received = performance.now();
     clearTimeout(boundary);
     if (data.status === 'waiting') {
-      video.pause().catch(() => {});
+      video.pause();
       current = null;
       currentProgramStart = null;
       pending = null;
@@ -261,10 +281,11 @@ async function sync() {
       stopForSleepTimer();
     currentProgramStart = data.programStart;
     if (current !== nextIdentity) {
-      current = nextIdentity;
       needsEntryPosition = true;
-      video.load(data.playUrl).catch(() => {});
+      loadVideo(data.playUrl);
+      current = nextIdentity;
     }
+    enter.disabled = false;
     document.querySelector('#current').textContent = label(data);
     document.querySelector('#next').textContent = `接下来：${label(data.next)}`;
     const position = data.programs.findIndex(
@@ -331,20 +352,57 @@ video.addEventListener('error', () => {
     offerEntry(video.error?.message || '视频加载失败，请重新进入频道。');
   }
 });
-video.addEventListener('resume', () => {
-  if (authenticated && started) offerEntry('声音播放被浏览器暂停，请点击重新进入频道。');
-});
 
 enter.onclick = () => {
-  // 浏览器要求音频解锁直接由用户点击触发，不能放到异步查询完成之后。
-  video.unlock();
   playbackIssue = '';
   started = true;
   needsEntryPosition = true;
   setStatus('正在进入频道…', true);
-  // 点击时先解锁声音；等查询完成、applyPosition 排入定位操作后才开始播放。
+  // 直接在点击处理函数中请求播放，满足浏览器的声音播放授权要求。
+  playChannel();
   sync();
 };
+
+// 原生 video 可以直接进入标准画中画；不支持的浏览器隐藏按钮。
+const pictureInPictureSupported =
+  document.pictureInPictureEnabled && 'requestPictureInPicture' in HTMLVideoElement.prototype;
+pictureInPicture.hidden = !pictureInPictureSupported;
+pictureInPicture.onclick = async () => {
+  try {
+    if (document.pictureInPictureElement === video) await document.exitPictureInPicture();
+    else {
+      if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+        setStatus('节目加载完成后才能进入小窗。', true);
+        return;
+      }
+      await video.requestPictureInPicture();
+    }
+  } catch {
+    setStatus('无法进入小窗，请检查浏览器是否允许画中画。', true);
+  }
+};
+video.addEventListener('enterpictureinpicture', () => {
+  pictureInPicture.setAttribute('aria-label', '退出小窗');
+  pictureInPicture.title = '退出小窗';
+  revealControls();
+});
+video.addEventListener('leavepictureinpicture', () => {
+  pictureInPicture.setAttribute('aria-label', '小窗播放');
+  pictureInPicture.title = '小窗播放';
+  revealControls();
+});
+
+// 网页全屏只铺满当前浏览器视口，适合作为系统全屏 API 不可用时的轻量模式。
+function setPageFullscreen(active) {
+  player.classList.toggle('page-fullscreen', active);
+  document.body.classList.toggle('player-expanded', active);
+  pageFullscreen.setAttribute('aria-pressed', String(active));
+  pageFullscreen.setAttribute('aria-label', active ? '退出网页全屏' : '网页全屏');
+  pageFullscreen.title = active ? '退出网页全屏' : '网页全屏';
+  revealControls();
+}
+pageFullscreen.onclick = () =>
+  setPageFullscreen(!player.classList.contains('page-fullscreen'));
 
 sleepTimerButton.onclick = () => {
   const opening = sleepTimerMenu.hidden;
@@ -372,6 +430,7 @@ document.addEventListener('pointerdown', (event) => {
 });
 sleepTimerMenu.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
+  event.stopPropagation();
   closeSleepTimerMenu();
   sleepTimerButton.focus();
   revealControls();
@@ -435,6 +494,10 @@ document.addEventListener('fullscreenchange', () => {
   if (!active) releaseOrientation();
   revealControls();
 });
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && player.classList.contains('page-fullscreen'))
+    setPageFullscreen(false);
+});
 
 // 页面可见性：切后台时释放常亮锁，切回前台时按播放需求重新申请。
 // 后台计时器可能被浏览器节流，恢复可见时也需要立即校准节目进度。
@@ -462,7 +525,7 @@ window.addEventListener('pagehide', () => {
   pageActive = false;
   clearSleepTimer();
   setScreenAwake(false);
-  video.clear().catch(() => {});
+  clearVideo();
 });
 // 浏览器从页面缓存恢复时，允许后续播放事件再次申请常亮。
 window.addEventListener('pageshow', () => {

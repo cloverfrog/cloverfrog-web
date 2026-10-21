@@ -48,11 +48,6 @@ p {
   background: #000;
 }
 #video {
-  width: 100%;
-  height: 100%;
-}
-#video canvas,
-#video video {
   display: block;
   width: 100%;
   height: 100%;
@@ -95,8 +90,8 @@ summary:focus-visible {
 #status {
   position: absolute;
   left: max(12px, env(safe-area-inset-left));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  max-width: calc(100% - 88px);
+  bottom: max(64px, env(safe-area-inset-bottom));
+  max-width: calc(100% - 24px);
   padding: 8px 12px;
   border-radius: 8px;
   background: #000b;
@@ -118,7 +113,9 @@ summary:focus-visible {
     visibility 0.2s;
 }
 #fullscreen,
-#sleep-timer {
+#sleep-timer,
+#picture-in-picture,
+#page-fullscreen {
   display: grid;
   place-items: center;
   height: 48px;
@@ -130,12 +127,21 @@ summary:focus-visible {
 #fullscreen {
   width: 48px;
 }
+#picture-in-picture,
+#page-fullscreen {
+  width: 48px;
+}
+#picture-in-picture[hidden] {
+  display: none;
+}
 #sleep-timer {
   grid-auto-flow: column;
   gap: 6px;
   padding: 0 12px;
 }
 #sleep-timer:hover,
+#picture-in-picture:hover,
+#page-fullscreen:hover,
 #fullscreen:hover {
   background: #ffffff30;
 }
@@ -212,6 +218,19 @@ li.active {
   aspect-ratio: auto;
   border-radius: 0;
 }
+/* 网页全屏不调用浏览器全屏 API，仅让播放器覆盖当前页面视口。 */
+body.player-expanded {
+  overflow: hidden;
+}
+#player.page-fullscreen {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
 /* 手机上的视频抵消正文边距贴边显示；其他内容仍保留阅读边距。 */
 @media (max-width: 600px) {
   main {
@@ -228,7 +247,7 @@ li.active {
     font-size: 10px;
     letter-spacing: 1px;
   }
-  #player:not(:fullscreen) {
+  #player:not(:fullscreen):not(.page-fullscreen) {
     margin-inline: -16px;
     width: calc(100% + 32px);
     border-radius: 0;
