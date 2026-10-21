@@ -13,6 +13,12 @@ const enter = document.querySelector('#enter');
 const entry = document.querySelector('.entry');
 const enterLabel = document.querySelector('#enter-label');
 const fullscreen = document.querySelector('#fullscreen');
+const controls = document.querySelector('#controls');
+const sleepTimerButton = document.querySelector('#sleep-timer');
+const sleepTimerLabel = document.querySelector('#sleep-timer-label');
+const sleepTimerMenu = document.querySelector('#sleep-timer-menu');
+const cancelSleepTimerButton = sleepTimerMenu.querySelector('[data-cancel]');
+const programEndTimerButton = sleepTimerMenu.querySelector('[data-program-end]');
 let hideControls,
   needsAttention = false,
   playbackIssue = '';
@@ -24,6 +30,71 @@ let screenLock = null, // 浏览器已授予的屏幕常亮锁；释放时需要
   screenLockRequest = null, // 正在等待的申请，避免多个播放事件重复申请。
   keepScreenAwake = false; // 播放状态是否需要常亮，与当前是否持有锁分开记录。
 let pageActive = true;
+
+// 定时关闭只保存在当前页面中。到时停止播放并释放屏幕常亮锁，不主动锁定设备。
+let sleepTimer = null,
+  sleepTimerTimeout = null,
+  sleepTimerTicker = null;
+
+function closeSleepTimerMenu() {
+  sleepTimerMenu.hidden = true;
+  sleepTimerButton.setAttribute('aria-expanded', 'false');
+}
+
+function updateSleepTimerLabel() {
+  if (!sleepTimer) {
+    sleepTimerLabel.textContent = '定时关闭';
+    sleepTimerButton.title = '定时关闭';
+    cancelSleepTimerButton.hidden = true;
+    return;
+  }
+  cancelSleepTimerButton.hidden = false;
+  if (sleepTimer.type === 'program') {
+    sleepTimerLabel.textContent = '本集结束';
+    sleepTimerButton.title = '当前节目结束后关闭';
+    return;
+  }
+  const remaining = Math.max(0, sleepTimer.deadline - Date.now());
+  const minutes = Math.floor(remaining / 60000);
+  const seconds = Math.floor((remaining % 60000) / 1000);
+  const text = `${minutes}:${String(seconds).padStart(2, '0')}`;
+  sleepTimerLabel.textContent = text;
+  sleepTimerButton.title = `${text} 后关闭`;
+}
+
+function clearSleepTimer() {
+  sleepTimer = null;
+  clearTimeout(sleepTimerTimeout);
+  clearInterval(sleepTimerTicker);
+  sleepTimerTimeout = null;
+  sleepTimerTicker = null;
+  updateSleepTimerLabel();
+}
+
+function stopForSleepTimer() {
+  if (!sleepTimer) return;
+  clearSleepTimer();
+  started = false;
+  setScreenAwake(false);
+  video.pause().catch(() => {});
+  offerEntry('定时关闭已停止播放。');
+}
+
+function startMinuteSleepTimer(minutes) {
+  clearSleepTimer();
+  sleepTimer = { type: 'deadline', deadline: Date.now() + minutes * 60000 };
+  sleepTimerTimeout = setTimeout(stopForSleepTimer, minutes * 60000);
+  sleepTimerTicker = setInterval(updateSleepTimerLabel, 1000);
+  updateSleepTimerLabel();
+}
+
+function startProgramEndSleepTimer() {
+  if (currentProgramStart === null) return;
+  clearSleepTimer();
+  // 播放地址可能在同一节目内刷新，节目开播时间才是稳定的节目轮次标识。
+  sleepTimer = { type: 'program', programStart: currentProgramStart };
+  updateSleepTimerLabel();
+}
 
 // 播放事件只需声明是否需要常亮，锁的实际申请和释放统一在下面处理。
 function setScreenAwake(value) {
@@ -99,9 +170,11 @@ function setAuthenticated(value) {
   authenticated = value;
   enter.disabled = !value;
   if (!value) {
+    clearSleepTimer();
     setScreenAwake(false);
     started = false;
     current = null;
+    currentProgramStart = null;
     pending = null;
     needsEntryPosition = false;
     clearTimeout(boundary);
@@ -121,6 +194,7 @@ function setAuthenticated(value) {
 // pending 保存待定位进度及收到响应的时刻；started 表示用户已点击进入频道。
 let busy = false,
   current = null,
+  currentProgramStart = null,
   boundary = null,
   pending = null,
   started = false;
@@ -167,6 +241,7 @@ async function sync() {
     if (data.status === 'waiting') {
       video.pause().catch(() => {});
       current = null;
+      currentProgramStart = null;
       pending = null;
       setStatus(`频道将于 ${new Date(data.startTime * 1000).toLocaleString()} 开播`, true);
       boundary = setTimeout(
@@ -178,8 +253,15 @@ async function sync() {
     // 用往返耗时的一半估计单程延迟，将服务端进度校准到响应接收时刻。
     const delay = (received - sent) / 2000;
     pending = { offset: data.offset + delay, received };
-    if (current !== identity(data)) {
-      current = identity(data);
+    const nextIdentity = identity(data);
+    if (
+      sleepTimer?.type === 'program' &&
+      sleepTimer.programStart !== data.programStart
+    )
+      stopForSleepTimer();
+    currentProgramStart = data.programStart;
+    if (current !== nextIdentity) {
+      current = nextIdentity;
       needsEntryPosition = true;
       video.load(data.playUrl).catch(() => {});
     }
@@ -264,11 +346,48 @@ enter.onclick = () => {
   sync();
 };
 
+sleepTimerButton.onclick = () => {
+  const opening = sleepTimerMenu.hidden;
+  sleepTimerMenu.hidden = !opening;
+  sleepTimerButton.setAttribute('aria-expanded', String(opening));
+  programEndTimerButton.disabled = currentProgramStart === null;
+  if (opening) sleepTimerMenu.querySelector('button:not([hidden]):not(:disabled)')?.focus();
+  revealControls();
+};
+sleepTimerMenu.onclick = (event) => {
+  const option = event.target.closest('button');
+  if (!option) return;
+  if (option.hasAttribute('data-cancel')) clearSleepTimer();
+  else if (option.hasAttribute('data-program-end')) startProgramEndSleepTimer();
+  else startMinuteSleepTimer(Number(option.dataset.minutes));
+  closeSleepTimerMenu();
+  sleepTimerButton.focus();
+  revealControls();
+};
+document.addEventListener('pointerdown', (event) => {
+  if (!controls.contains(event.target) && !sleepTimerMenu.hidden) {
+    closeSleepTimerMenu();
+    revealControls();
+  }
+});
+sleepTimerMenu.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  closeSleepTimerMenu();
+  sleepTimerButton.focus();
+  revealControls();
+});
+
 // 全屏按钮在正常播放且无人操作时自动隐藏；缓冲、报错或键盘操作时保持可用。
 function revealControls() {
   clearTimeout(hideControls);
   player.classList.remove('controls-hidden');
-  if (entry.hidden && !video.paused && video.readyState >= 3 && !needsAttention) {
+  if (
+    sleepTimerMenu.hidden &&
+    entry.hidden &&
+    !video.paused &&
+    video.readyState >= 3 &&
+    !needsAttention
+  ) {
     hideControls = setTimeout(() => {
       if (player.querySelector('button:focus-visible')) return;
       player.classList.add('controls-hidden');
@@ -341,6 +460,7 @@ requireUser()
 // 离开页面时停止常亮并释放播放器；pageActive 防止迟到的申请重新持有常亮锁。
 window.addEventListener('pagehide', () => {
   pageActive = false;
+  clearSleepTimer();
   setScreenAwake(false);
   video.clear().catch(() => {});
 });
