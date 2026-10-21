@@ -24,11 +24,7 @@ tests/        # 后端测试
 
 ```bash
 python -m venv .venv
-```
-
-Windows PowerShell 使用 `.\.venv\Scripts\Activate.ps1`；Linux/macOS 使用 `source .venv/bin/activate`。然后安装依赖并复制配置：
-
-```bash
+source .venv/bin/activate # PowerShell: .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 

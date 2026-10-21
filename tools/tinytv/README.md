@@ -63,5 +63,5 @@ python generate_schedule.py --min-run 2 --max-run 3
 在已经配置了 `~/.ssh/config` 的情况下，使用 `scp` 上传数据文件到服务器：
 
 ```bash
-scp backend/data/tinytv/media.json backend/data/tinytv/sources.json backend/data/tinytv/schedule.json aliyun:/srv/backend/backend/data/tinytv
+scp backend/data/tinytv/media.json backend/data/tinytv/sources.json backend/data/tinytv/schedule.json aliyun:/srv/web/backend/data/tinytv
 ```

@@ -20,8 +20,7 @@
 2. 在后端项目根目录启动 API：
 
    ```powershell
-   cd backend
-   .\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8765 --reload
+   backend\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8765 --reload
    ```
 
 3. 安装 Caddy 后，在本网站项目根目录启动：
