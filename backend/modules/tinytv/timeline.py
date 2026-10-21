@@ -12,6 +12,35 @@ def read_json(name):
     return json.loads((DATA_DIR / name).read_text(encoding="utf-8-sig"))
 
 
+def valid_duration(value):
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(value)
+        and value > 0
+    )
+
+
+def source_parts(source, legacy_duration=None):
+    """Normalize a source into ordered files without mutating the input data."""
+    if "parts" in source:
+        if "path" in source or "duration" in source:
+            raise ValueError("Multipart source cannot also define path or duration")
+        raw_parts = source["parts"]
+        if not isinstance(raw_parts, list) or not raw_parts:
+            raise ValueError("Source parts must be a non-empty array")
+    else:
+        raw_parts = [{"path": source.get("path"), "duration": source.get("duration", legacy_duration)}]
+    parts = []
+    for part in raw_parts:
+        if not isinstance(part, dict) or not isinstance(part.get("path"), str) or not part["path"]:
+            raise ValueError("Missing or invalid source path")
+        if not valid_duration(part.get("duration")):
+            raise ValueError("Missing or invalid source duration")
+        parts.append({"path": part["path"], "duration": part["duration"]})
+    return parts
+
+
 # 纯计算过程，不读取当前时钟或修改输入；调用方传入 now，方便查询任意时刻的播放位置。
 def timeline(schedule, sources, now):
     start = datetime.fromisoformat(schedule["startTime"])
@@ -33,17 +62,9 @@ def timeline(schedule, sources, now):
         key = (program["title"], program["season"], program["episode"])
         if key not in index:
             raise ValueError("Missing scheduled source")
-        # 优先用资源探测的时长；只有资源未提供 duration 字段时才回退到旧节目表时长。
-        # 已提供但无效的资源时长必须报错，不能用旧值掩盖配置问题。
-        duration = index[key].get("duration", program.get("duration"))
-        if (
-            isinstance(duration, bool)
-            or not isinstance(duration, (int, float))
-            or not math.isfinite(duration)
-            or duration <= 0
-        ):
-            raise ValueError("Missing or invalid source duration")
-        programs.append({**program, "duration": duration})
+        # 单文件资源暂时兼容旧节目表时长；多文件资源必须为每个 part 提供实际时长。
+        parts = source_parts(index[key], program.get("duration"))
+        programs.append({**program, "duration": sum(part["duration"] for part in parts)})
     # 总时长决定循环周期；开播前不尝试定位视频，只向前端返回等待状态。
     total = sum(p["duration"] for p in programs)
     epoch = start.timestamp()
@@ -57,15 +78,28 @@ def timeline(schedule, sources, now):
         # 边界采用左闭右开区间，恰好到结束时间时切入下一节目。
         if now < end:
             key = (program["title"], program["season"], program["episode"])
+            parts = source_parts(index[key], program["duration"])
+            program_offset = now - cursor
+            part_cursor = 0.0
+            for part_index, part in enumerate(parts):
+                part_end = part_cursor + part["duration"]
+                if program_offset < part_end:
+                    break
+                part_cursor = part_end
+            else:
+                raise ValueError("Unable to locate source part")
             return {
                 **program,
                 "channel": schedule["channel"],
                 "status": "playing",
-                "path": index[key]["path"],
-                "offset": now - cursor,
-                "remaining": end - now,
+                "path": part["path"],
+                "offset": program_offset - part_cursor,
+                "remaining": part_end - program_offset,
+                "programRemaining": end - now,
                 "programStart": cursor,
                 "programEnd": end,
+                "partIndex": part_index + 1,
+                "partCount": len(parts),
                 "serverTime": now,
                 "next": programs[(position + 1) % len(programs)],
                 "programs": programs,

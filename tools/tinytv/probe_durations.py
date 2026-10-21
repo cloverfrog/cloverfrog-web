@@ -22,9 +22,25 @@ def valid_duration(value):
     )
 
 
-# 同一集换了文件路径后必须重新探测，因此断点缓存的键还包含 path。
-def record_key(record):
-    return record['title'], record['season'], record['episode'], record['path']
+def episode_key(record):
+    return record['title'], record['season'], record['episode']
+
+
+def source_files(record):
+    """Return the mutable file objects contained in one logical episode."""
+    if 'parts' in record:
+        if 'path' in record or 'duration' in record:
+            raise ValueError('Multipart source cannot also define path or duration')
+        parts = record['parts']
+        if not isinstance(parts, list) or not parts:
+            raise ValueError('Source parts must be a non-empty array')
+        return parts
+    return [record]
+
+
+# 同一集的任一文件路径变化后只重新探测该文件，因此断点缓存键包含剧集和 path。
+def file_key(record, source_file):
+    return (*episode_key(record), source_file['path'])
 
 
 def load_sources(path):
@@ -33,24 +49,41 @@ def load_sources(path):
         raise ValueError('Sources must be a JSON array')
     seen = set()
     for record in records:
-        key = record_key(record)
-        if not isinstance(key[0], str) or not isinstance(key[3], str) or not key[3]:
-            raise ValueError('Source title and path must be strings')
-        if key[:3] in seen:
+        key = episode_key(record)
+        if not isinstance(key[0], str) or not key[0]:
+            raise ValueError('Source title must be a non-empty string')
+        if key in seen:
             raise ValueError('Duplicate title/season/episode')
-        seen.add(key[:3])
+        seen.add(key)
+        paths = set()
+        for source_file in source_files(record):
+            if not isinstance(source_file, dict):
+                raise ValueError('Source parts must be objects')
+            path_value = source_file.get('path')
+            if not isinstance(path_value, str) or not path_value:
+                raise ValueError('Source path must be a non-empty string')
+            if path_value in paths:
+                raise ValueError('Duplicate path within source parts')
+            paths.add(path_value)
     return records
 
 
 def prepare_records(records, previous):
     """Resume only matching files; changed paths must be probed again."""
-    cached = {record_key(record): record.get('duration') for record in previous}
+    cached = {
+        file_key(record, source_file): source_file.get('duration')
+        for record in previous
+        for source_file in source_files(record)
+    }
     result = []
     for record in records:
         item = dict(record)
-        value = cached.get(record_key(record))
-        if not valid_duration(item.get('duration')) and valid_duration(value):
-            item['duration'] = value
+        if 'parts' in record:
+            item['parts'] = [dict(part) for part in record['parts']]
+        for source_file in source_files(item):
+            value = cached.get(file_key(item, source_file))
+            if not valid_duration(source_file.get('duration')) and valid_duration(value):
+                source_file['duration'] = value
         result.append(item)
     return result
 
@@ -81,22 +114,26 @@ def probe_duration(url, executable='ffprobe', timeout=60):
         '-rw_timeout', '15000000',
         '-show_entries', 'format=duration',
         '-of', 'json',
-        url,
     ]
-    try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=timeout,
-            check=True,
-        )
-    except subprocess.TimeoutExpired:
-        raise ValueError('Probe timed out') from None
-    except subprocess.CalledProcessError as error:
-        # ffprobe 的 stderr 可能包含私有媒体地址，错误报告只保留退出码。
-        raise ValueError(f'ffprobe failed (exit {error.returncode})') from None
+    result = None
+    # 少数 AList 资源虽然支持 Range，但 ffprobe 的跳转读取会一直等待；超时后改为顺序读取。
+    for input_options in ([], ['-seekable', '0']):
+        try:
+            result = subprocess.run(
+                [*command, *input_options, url],
+                capture_output=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=timeout,
+                check=True,
+            )
+            break
+        except subprocess.TimeoutExpired:
+            if input_options:
+                raise ValueError('Probe timed out') from None
+        except subprocess.CalledProcessError as error:
+            # ffprobe 的 stderr 可能包含私有媒体地址，错误报告只保留退出码。
+            raise ValueError(f'ffprobe failed (exit {error.returncode})') from None
     try:
         value = float(json.loads(result.stdout)['format']['duration'])
         if not valid_duration(value):
@@ -146,29 +183,42 @@ def main(argv=None):
         attempts = completed = skipped = 0
         save_json(args.output, records)
         save_json(errors_path, errors)
-        # 每处理一条就保存检查点，重新运行时跳过已有有效时长的资源。
-        for position, record in enumerate(records, 1):
-            if valid_duration(record.get('duration')):
+        files = [
+            (record, source_file, part_index, len(source_files(record)))
+            for record in records
+            for part_index, source_file in enumerate(source_files(record), 1)
+        ]
+        # 每处理一个文件就保存检查点，重新运行时跳过已有有效时长的资源。
+        for position, (record, source_file, part_index, part_count) in enumerate(files, 1):
+            if valid_duration(source_file.get('duration')):
                 skipped += 1
                 continue
             if args.limit is not None and attempts >= args.limit:
                 break
             attempts += 1
             try:
-                record['duration'] = probe_duration(
-                    direct_url(base, root, record['path']), args.ffprobe, args.timeout
+                source_file['duration'] = probe_duration(
+                    direct_url(base, root, source_file['path']), args.ffprobe, args.timeout
                 )
                 completed += 1
-                print(f'[{position}/{len(records)}] OK {record["duration"]:.6f}s', flush=True)
+                suffix = f' part {part_index}/{part_count}' if part_count > 1 else ''
+                print(
+                    f'[{position}/{len(files)}] OK{suffix} {source_file["duration"]:.6f}s',
+                    flush=True,
+                )
             except ValueError as error:
                 errors.append(
                     {key: record[key] for key in ('title', 'season', 'episode')}
-                    | {'error': str(error)}
+                    | {'path': source_file['path'], 'part': part_index, 'error': str(error)}
                 )
-                print(f'[{position}/{len(records)}] FAILED: {error}', flush=True)
+                print(f'[{position}/{len(files)}] FAILED: {error}', flush=True)
             save_json(args.output, records)
             save_json(errors_path, errors)
-        missing = sum(not valid_duration(record.get('duration')) for record in records)
+        missing = sum(
+            not valid_duration(source_file.get('duration'))
+            for record in records
+            for source_file in source_files(record)
+        )
         print(f'Collected: {completed}; skipped: {skipped}; failed: {len(errors)}; remaining: {missing}')
         print(f'Result: {args.output}; errors from this run: {errors_path}')
         return 1 if errors else 0

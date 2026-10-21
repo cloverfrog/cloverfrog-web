@@ -96,20 +96,46 @@ def build_records(config, files):
             number = int(season['season'])
             count = int(season['episodes'])
             template = season['pattern']
+            episode_parts = season.get('episodeParts', {})
+            if not isinstance(episode_parts, dict):
+                raise ValueError('episodeParts must be an object keyed by episode number')
             for episode in range(1, count + 1):
-                pattern = template.format(season=number, episode=episode).lstrip('/')
-                matches = sorted(path for path in files if fnmatch.fnmatchcase(path, pattern))
-                if len(matches) != 1:
-                    message = f'{title} S{number}E{episode}: 匹配到 {len(matches)} 个文件 [{pattern}]'
+                multipart = str(episode) in episode_parts
+                part_patterns = episode_parts.get(str(episode))
+                patterns = part_patterns if multipart else [template]
+                if not isinstance(patterns, list) or not patterns or not all(
+                    isinstance(pattern, str) and pattern for pattern in patterns
+                ):
+                    raise ValueError(f'{title} S{number}E{episode}: episodeParts must be a non-empty string array')
+                matched = []
+                failed = False
+                for raw_pattern in patterns:
+                    pattern = raw_pattern.format(season=number, episode=episode).lstrip('/')
+                    matches = sorted(path for path in files if fnmatch.fnmatchcase(path, pattern))
+                    if len(matches) != 1:
+                        message = f'{title} S{number}E{episode}: 匹配到 {len(matches)} 个文件 [{pattern}]'
+                        print('警告：' + message, file=sys.stderr)
+                        errors.append(message)
+                        failed = True
+                    else:
+                        matched.append('/' + matches[0])
+                if failed:
+                    continue
+                if len(set(matched)) != len(matched):
+                    message = f'{title} S{number}E{episode}: 分段匹配到重复文件'
                     print('警告：' + message, file=sys.stderr)
                     errors.append(message)
                     continue
-                records.append({
+                record = {
                     'title': title,
                     'season': number,
                     'episode': episode,
-                    'path': '/' + matches[0],
-                })
+                }
+                if multipart:
+                    record['parts'] = [{'path': path} for path in matched]
+                else:
+                    record['path'] = matched[0]
+                records.append(record)
     return records, errors
 
 

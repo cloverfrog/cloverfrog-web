@@ -8,7 +8,23 @@
 python tools/tinytv/build_sources.py --config sources_config.json --output backend/data/tinytv/sources.json
 ```
 
-输出只包含 `title`、`season`、`episode` 和相对于 `ALIST_ROOT` 的 `path`，不探测 `duration`。生成后再运行 `probe_durations.py`；它会跳过已有有效时长，并从既有输出恢复路径未变化的记录。
+普通剧集输出 `title`、`season`、`episode` 和相对于 `ALIST_ROOT` 的 `path`，不探测 `duration`。一个逻辑剧集需要依次播放多个文件时，在对应 season 中用 `episodeParts` 显式列出各 part 的匹配规则：
+
+```json
+{
+  "season": 5,
+  "episodes": 20,
+  "pattern": "Show/S{season:02d}E{episode:02d}.mp4",
+  "episodeParts": {
+    "12": [
+      "Show/S{season:02d}E{episode:02d}a.mp4",
+      "Show/S{season:02d}E{episode:02d}b.mp4"
+    ]
+  }
+}
+```
+
+每条 part 规则必须恰好匹配一个文件，且同一集不能重复匹配同一文件；输出使用有序的 `parts: [{"path": ...}, ...]`。没有列入 `episodeParts` 的剧集继续要求普通 `pattern` 恰好匹配一个文件。生成后再运行 `probe_durations.py`；它会分别探测每个文件，跳过已有有效时长，并从既有输出恢复路径未变化的结果。
 
 `--dry-run` 会完成 AList 枚举和匹配检查，但不写输出文件。AList 对 `ALIST_ROOT` 需要允许目录浏览。
 
@@ -27,20 +43,20 @@ python tools/tinytv/probe_durations.py
 | 文件 | 用途 |
 | --- | --- |
 | `backend/data/tinytv/sources.json` | 输入，保持原样 |
-| `backend/data/tinytv/sources.probed.json` | 输出，补充数值型 `duration`，单位为秒 |
+| `backend/data/tinytv/sources.probed.json` | 输出，为单文件记录或每个 part 补充数值型 `duration`，单位为秒 |
 | `backend/data/tinytv/sources.probed.errors.json` | 本次运行的失败记录 |
 
-每处理一条保存一次结果。重复运行相同命令会跳过已有有效时长，并从输出文件恢复同一分集、同一路径的采集结果；失败项会重试。中断后也可直接重跑。
+每处理一个视频文件保存一次结果。重复运行相同命令会跳过已有有效时长，并从输出文件恢复同一分集、同一路径的采集结果；多文件剧集只重新探测缺失或路径发生变化的 part。失败项会重试，中断后也可直接重跑。
 
 检查输出的 `failed`、`remaining` 和结果文件，确认所需分集时长完整后，再自行替换 `sources.json`。工具不会自动替换原文件或修改节目单。
 
-可用 `--input`、`--output` 指定文件，`--base-url`、`--root` 覆盖 AList 配置，`--ffprobe` 指定程序位置；单文件总超时默认 60 秒，可用 `--timeout` 调整。完整参数见 `--help`。
+可用 `--input`、`--output` 指定文件，`--base-url`、`--root` 覆盖 AList 配置，`--ffprobe` 指定程序位置；单次探测超时默认 60 秒，可用 `--timeout` 调整。普通探测超时后，工具会禁用 HTTP 跳转读取并顺序重试一次，因此单个异常文件最多会等待两次超时时间。完整参数见 `--help`。
 
-数据字段与后端行为见 [TinyTV 模块说明](../../modules/tinytv/README.md)。
+数据字段与后端行为见 [TinyTV 模块说明](../../backend/modules/tinytv/README.md)。
 
 ## generate_schedule.py — 随机节目编排脚本
 
-用于 TinyTV 的节目单生成工具。读取 `sources.json` 中的视频资源及其时长，随机打散不同动画的播放顺序，生成固定的 `schedule.json` 节目时间线。
+用于 TinyTV 的节目单生成工具。读取 `sources.json` 中的逻辑剧集及其时长，随机打散不同动画的播放顺序，生成固定的 `schedule.json` 节目时间线。多文件剧集的时长为所有 part 之和，在抽取、计数和节目单中仍只算一集。
 
 **编排规则：**
 - **随机起点**：每部作品从随机一集开始，之后按季数、集数顺序播放；播到末尾自动接回开头。

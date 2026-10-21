@@ -23,6 +23,19 @@ class ProbeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'timed out'):
                 tool.probe_duration('https://private.example')
 
+    def test_timeout_retries_with_nonseekable_input(self):
+        completed = subprocess.CompletedProcess([], 0, '{"format":{"duration":"10.5"}}')
+        with patch.object(
+            tool.subprocess,
+            'run',
+            side_effect=[subprocess.TimeoutExpired([], 1), completed],
+        ) as run:
+            self.assertEqual(tool.probe_duration('https://private.example'), 10.5)
+        self.assertNotIn('-seekable', run.call_args_list[0].args[0])
+        retry_command = run.call_args_list[1].args[0]
+        self.assertEqual(retry_command[retry_command.index('-seekable') + 1], '0')
+        self.assertEqual(retry_command[-1], 'https://private.example')
+
     def test_changed_paths_are_not_resumed(self):
         original = {'title':'show', 'season':1, 'episode':1, 'path':'/new.mp4'}
         old = {**original, 'path':'/old.mp4', 'duration':10}
@@ -30,6 +43,38 @@ class ProbeTests(unittest.TestCase):
         same = {**original, 'duration':20}
         self.assertEqual(tool.prepare_records([original], [same])[0]['duration'], 20)
         self.assertNotIn('duration', original)
+
+    def test_resumes_and_probes_multipart_files_independently(self):
+        current = [{
+            'title': 'show', 'season': 1, 'episode': 1,
+            'parts': [{'path': '/a.mp4'}, {'path': '/new-b.mp4'}],
+        }]
+        previous = [{
+            'title': 'show', 'season': 1, 'episode': 1,
+            'parts': [
+                {'path': '/a.mp4', 'duration': 10},
+                {'path': '/old-b.mp4', 'duration': 20},
+            ],
+        }]
+        prepared = tool.prepare_records(current, previous)
+        self.assertEqual(prepared[0]['parts'][0]['duration'], 10)
+        self.assertNotIn('duration', prepared[0]['parts'][1])
+        self.assertNotIn('duration', current[0]['parts'][0])
+
+    def test_batch_probes_each_multipart_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source, output = Path(temporary)/'sources.json', Path(temporary)/'result.json'
+            source.write_text(json.dumps([{
+                'title': 'show', 'season': 1, 'episode': 1,
+                'parts': [{'path': '/a.mp4'}, {'path': '/b.mp4'}],
+            }]), encoding='utf-8')
+            with (patch.object(tool.shutil, 'which', return_value='ffprobe'),
+                  patch.object(tool, 'probe_duration', side_effect=[10, 20]) as probe,
+                  contextlib.redirect_stdout(io.StringIO())):
+                self.assertEqual(tool.main(['--input', str(source), '--output', str(output)]), 0)
+                self.assertEqual(probe.call_count, 2)
+            parts = json.loads(output.read_text()) [0]['parts']
+            self.assertEqual([part['duration'] for part in parts], [10, 20])
 
     def test_batch_preserves_input_and_retries_missing(self):
         with tempfile.TemporaryDirectory() as temporary:

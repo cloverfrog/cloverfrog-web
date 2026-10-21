@@ -35,13 +35,22 @@
 
 ```json
 [
-  {"title": "示例节目", "season": 1, "episode": 1, "path": "示例节目/S01E01.mp4", "duration": 600.25}
+  {"title": "示例节目", "season": 1, "episode": 1, "path": "示例节目/S01E01.mp4", "duration": 600.25},
+  {
+    "title": "示例节目",
+    "season": 1,
+    "episode": 2,
+    "parts": [
+      {"path": "示例节目/S01E02a.mp4", "duration": 300.5},
+      {"path": "示例节目/S01E02b.mp4", "duration": 320.75}
+    ]
+  }
 ]
 ```
 
-通过 title、season、episode 匹配节目与媒体源，组合键不可重复，每个编排的节目都必须有对应媒体源。实际读取路径为 `ALIST_ROOT + '/' + path`。
+通过 title、season、episode 匹配节目与媒体源，组合键不可重复，每个编排的节目都必须有对应媒体源。普通剧集使用 `path + duration`；一个逻辑剧集由多个文件组成时改用有序的 `parts`，不可同时保留顶层 `path` 或 `duration`。各部分按数组顺序无间隔播放，节目单中仍只计作一集。实际读取路径为 `ALIST_ROOT + '/' + path`。
 
-`duration` 是具体视频文件的实际时长，单位为秒，必须为正数，允许小数。后端优先读取源记录的时长；字段缺失时暂时兼容旧节目单中的时长。源记录已有该字段但值无效时返回 503。批量采集方法见[本地维护工具](../../tools/tinytv/README.md)。
+`duration` 是对应视频文件的实际时长，单位为秒，必须为正数，允许小数。多文件剧集的逻辑时长是各 part 时长之和。后端优先读取源记录的时长；单文件记录缺失该字段时暂时兼容旧节目单中的时长，多文件记录则要求每个 part 都有有效时长。无效数据使频道接口返回 503。批量采集方法见[本地维护工具](../../../tools/tinytv/README.md)。
 
 前端使用浏览器原生 `<video>` 播放，不附带额外解码器。片源应采用目标浏览器支持的封装和编码；为了兼容常见桌面与移动浏览器，建议统一为 MP4 封装、H.264 视频和 AAC 音频，并修复异常时间戳、关键帧和索引信息。
 
@@ -49,7 +58,9 @@
 
 | 方法与路径 | 用途 |
 | --- | --- |
-| `GET /api/tinytv/channels/tiny/now` | 认证后返回当前节目、偏移、剩余时间、下一节目、循环节目单和 AList `/d/...` 地址 playUrl；开播前返回 waiting 与开播时间 |
+| `GET /api/tinytv/channels/tiny/now` | 认证后返回当前节目、当前文件内偏移和剩余时间、逻辑剧集剩余时间、分段序号、下一节目、循环节目单和 AList `/d/...` 地址 playUrl；开播前返回 waiting 与开播时间 |
+
+播放状态中的 `offset`、`remaining` 对应当前视频文件，供播放器在 part 边界换源；`programStart`、`programEnd`、`programRemaining` 和 `duration` 对应完整逻辑剧集。`partIndex` 从 1 开始，`partCount` 是该集文件数，单文件剧集分别为 1 和 1。
 
 接口需要公共认证，响应禁止缓存。不再提供 `/api/tinytv/play/{key}` 接口。浏览器直接使用 playUrl 播放，AList 的下载重定向、Range 请求和视频传输均不经过本站后端。
 
@@ -61,6 +72,6 @@ AList 及重定向后的媒体源需要允许网站跨域读取（CORS），支�
 
 ## 验证
 
-`tests/test_timeline.py` 验证开播、边界、循环和节目时长；`tests/test_api.py` 验证登录限制、AList 下载地址和路径编码，并确认频道接口不访问 AList 或媒体源。统一运行命令见[后端 README](../../README.md)。
+`tests/test_timeline.py` 验证开播、节目及分段边界、循环和节目时长；`tests/test_api.py` 验证登录限制、AList 下载地址和路径编码，并确认频道接口不访问 AList 或媒体源。统一运行命令见[后端 README](../../README.md)。
 
 真实联调时配置可访问的 AList 挂载和媒体源，使用普通账号登录前端，验证从当前进度播放、节目切换、视频编码支持和退出。
