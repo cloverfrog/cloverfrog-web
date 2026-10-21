@@ -458,25 +458,45 @@ sleepTimerMenu.addEventListener('keydown', (event) => {
   revealControls();
 });
 
-// 全屏按钮在正常播放且无人操作时自动隐藏；缓冲、报错或键盘操作时保持可用。
-function revealControls() {
-  clearTimeout(hideControls);
-  player.classList.remove('controls-hidden');
-  if (
+// 播放托盘在正常播放且无人操作时自动隐藏；缓冲、报错或键盘操作时保持可用。
+function canHideControls() {
+  return (
     sleepTimerMenu.hidden &&
     entry.hidden &&
     !video.paused &&
     video.readyState >= 3 &&
-    !needsAttention
-  ) {
-    hideControls = setTimeout(() => {
-      if (player.querySelector('button:focus-visible')) return;
-      player.classList.add('controls-hidden');
-    }, 2500);
-  }
+    !needsAttention &&
+    !player.querySelector('button:focus-visible')
+  );
 }
-['pointermove', 'pointerdown', 'keydown', 'focusin', 'focusout'].forEach((event) => {
+function hidePlayerControls() {
+  clearTimeout(hideControls);
+  if (canHideControls()) player.classList.add('controls-hidden');
+}
+function revealControls() {
+  clearTimeout(hideControls);
+  player.classList.remove('controls-hidden');
+  if (canHideControls()) hideControls = setTimeout(hidePlayerControls, 2500);
+}
+['keydown', 'focusin', 'focusout'].forEach((event) => {
   player.addEventListener(event, revealControls);
+});
+player.addEventListener('pointermove', (event) => {
+  if (event.pointerType !== 'touch') revealControls();
+});
+player.addEventListener('pointerdown', (event) => {
+  // 触屏点击画面切换托盘；操作托盘里的按钮时保持显示，避免吞掉按钮点击。
+  if (event.pointerType === 'touch' && !controls.contains(event.target)) {
+    if (player.classList.contains('controls-hidden')) revealControls();
+    else hidePlayerControls();
+    return;
+  }
+  revealControls();
+});
+player.addEventListener('pointerleave', (event) => {
+  const fullscreenActive =
+    document.fullscreenElement === player || player.classList.contains('page-fullscreen');
+  if (event.pointerType === 'mouse' && !fullscreenActive) hidePlayerControls();
 });
 
 // 全屏与手机横屏：进入全屏后尝试锁定横屏，退出时解除；横屏失败不影响全屏观看。
