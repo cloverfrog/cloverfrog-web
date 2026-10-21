@@ -33,6 +33,14 @@
         </svg>
       </button>
     </section>
+    <form id="sleep-form" class="sleep-timer">
+      <label for="sleep-minutes">定时停止（分钟）</label>
+      <input id="sleep-minutes" type="number" min="1" max="180" step="1" value="30" required />
+      <button type="submit">开始 / 重设</button>
+      <button id="sleep-cancel" type="button" disabled>取消定时</button>
+      <output id="sleep-status" aria-live="off">未设置定时</output>
+      <small>设置后允许自动熄屏。锁屏播放取决于浏览器；页面被冻结时会在恢复后检查到期。</small>
+    </form>
     <h2 id="current">等待节目</h2>
     <p id="next"></p>
     <details>

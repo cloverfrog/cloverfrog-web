@@ -1,6 +1,7 @@
 import { API_URL } from '/config.js';
 import { requireUser, goToLogin } from '/assets/auth.mjs';
 import { TinyTVPlayback } from './playback.js';
+import { SleepTimer } from './sleep-timer.mjs';
 
 // 频道页面入口：查询当前节目并校准播放进度，管理播放提示、屏幕常亮和全屏交互。
 // AVPlayer 的加载、解码、定位与操作排队由 playback.js 负责。
@@ -24,6 +25,40 @@ let screenLock = null, // 浏览器已授予的屏幕常亮锁；释放时需要
   screenLockRequest = null, // 正在等待的申请，避免多个播放事件重复申请。
   keepScreenAwake = false; // 播放状态是否需要常亮，与当前是否持有锁分开记录。
 let pageActive = true;
+let sleepStopped = false;
+const sleepForm = document.querySelector('#sleep-form');
+const sleepMinutes = document.querySelector('#sleep-minutes');
+const sleepStatus = document.querySelector('#sleep-status');
+const sleepCancel = document.querySelector('#sleep-cancel');
+const sleepTimer = new SleepTimer({
+  onUpdate(seconds) {
+    sleepStatus.textContent = seconds === null ? '未设置定时' :
+      `剩余 ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} 后停止`;
+    sleepCancel.disabled = seconds === null;
+  },
+  onExpire() {
+    sleepStopped = true;
+    started = false;
+    current = null;
+    pending = null;
+    needsEntryPosition = false;
+    clearTimeout(boundary);
+    setScreenAwake(false);
+    // clear 递增播放器版本，废弃加载、定位和播放队列中的旧任务。
+    video.clear().catch(() => {});
+    offerEntry('定时已到，播放已停止。点击重新进入频道可继续观看。');
+    sleepStatus.textContent = '定时已到，播放已停止';
+  }
+});
+sleepForm.onsubmit = (event) => {
+  event.preventDefault();
+  if (!sleepForm.reportValidity()) return;
+  if (sleepTimer.start(Number(sleepMinutes.value))) updateScreenLock();
+};
+sleepCancel.onclick = () => {
+  sleepTimer.cancel();
+  updateScreenLock();
+};
 
 // 播放事件只需声明是否需要常亮，锁的实际申请和释放统一在下面处理。
 function setScreenAwake(value) {
@@ -33,7 +68,7 @@ function setScreenAwake(value) {
 
 // 让浏览器持有的锁符合当前播放需求和页面状态；播放中切回前台也调用这里。
 function updateScreenLock() {
-  const shouldHold = () => keepScreenAwake && pageActive && !document.hidden;
+  const shouldHold = () => keepScreenAwake && !sleepTimer.active && pageActive && !document.hidden;
   if (!shouldHold()) {
     // 先清空引用，再异步释放，后续状态更新就不会误以为仍然持有锁。
     const lock = screenLock;
@@ -79,6 +114,7 @@ function offerEntry(message) {
   setStatus(message, true);
 }
 function playChannel() {
+  if (sleepTimer.check() || sleepStopped || !started || !pageActive) return;
   video.play().catch((error) => {
     // 切集会取消旧节目的播放请求，这是正常换源，不应提示用户重新进入。
     if (error.name === 'AbortError') return;
@@ -146,7 +182,7 @@ function applyPosition() {
 
 // 查询当前节目、更新节目单，并安排节目边界的下一次查询；定时轮询负责兜底校准。
 async function sync() {
-  if (busy || !authenticated) return;
+  if (sleepTimer.check() || sleepStopped || !pageActive || busy || !authenticated) return;
   busy = true;
   try {
     const sent = performance.now();
@@ -161,7 +197,7 @@ async function sync() {
     }
     if (!response.ok) throw new Error(`接口返回 ${response.status}`);
     const data = await response.json();
-    if (!authenticated) return;
+    if (sleepTimer.check() || sleepStopped || !pageActive || !authenticated) return;
     const received = performance.now();
     clearTimeout(boundary);
     if (data.status === 'waiting') {
@@ -211,6 +247,7 @@ async function sync() {
     applyPosition();
     boundary = setTimeout(sync, Math.max(100, (data.remaining - delay) * 1000 + 50));
   } catch (error) {
+    if (sleepTimer.check() || sleepStopped || !pageActive || !authenticated) return;
     setStatus(`同步失败：${error.message}。稍后自动重试。`, true);
   } finally {
     busy = false;
@@ -225,10 +262,15 @@ video.addEventListener('ended', () => {
   sync();
 });
 video.addEventListener('play', () => {
+  if (sleepTimer.check() || sleepStopped || !pageActive) {
+    video.clear().catch(() => {});
+    return;
+  }
   started = true;
   sync();
 });
 video.addEventListener('playing', () => {
+  if (sleepTimer.check() || sleepStopped || !pageActive) return;
   setScreenAwake(true);
   playbackIssue = '';
   entry.hidden = true;
@@ -255,6 +297,8 @@ video.addEventListener('resume', () => {
 
 enter.onclick = () => {
   // 浏览器要求音频解锁直接由用户点击触发，不能放到异步查询完成之后。
+  sleepTimer.check();
+  sleepStopped = false;
   video.unlock();
   playbackIssue = '';
   started = true;
@@ -320,6 +364,7 @@ document.addEventListener('fullscreenchange', () => {
 // 页面可见性：切后台时释放常亮锁，切回前台时按播放需求重新申请。
 // 后台计时器可能被浏览器节流，恢复可见时也需要立即校准节目进度。
 document.addEventListener('visibilitychange', () => {
+  sleepTimer.check();
   updateScreenLock();
   if (!document.hidden) sync();
 });
@@ -347,5 +392,7 @@ window.addEventListener('pagehide', () => {
 // 浏览器从页面缓存恢复时，允许后续播放事件再次申请常亮。
 window.addEventListener('pageshow', () => {
   pageActive = true;
+  sleepTimer.check();
   updateScreenLock();
+  sync();
 });
