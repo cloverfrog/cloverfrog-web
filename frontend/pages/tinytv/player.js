@@ -190,6 +190,7 @@ function setAuthenticated(value) {
     current = null;
     currentProgramStart = null;
     pending = null;
+    channelClock = null;
     needsEntryPosition = false;
     clearTimeout(boundary);
     clearVideo();
@@ -211,6 +212,8 @@ let busy = false,
   currentProgramStart = null,
   boundary = null,
   pending = null,
+  channelClock = null,
+  positioning = false,
   started = false;
 let needsEntryPosition = false;
 const label = (program) => `${program.title} · 第 ${program.season} 季 第 ${program.episode} 集`;
@@ -227,8 +230,10 @@ function applyPosition() {
   // 元数据就绪后先定位再播放，避免从片头闪播。
   if (needsEntryPosition || Math.abs(video.currentTime - target) > 30) {
     try {
+      positioning = true;
       video.currentTime = target;
     } catch {
+      positioning = false;
       setStatus('无法定位到频道当前进度，请重新进入频道。', true);
       return;
     }
@@ -263,6 +268,7 @@ async function sync() {
       current = null;
       currentProgramStart = null;
       pending = null;
+      channelClock = null;
       setStatus(`频道将于 ${new Date(data.startTime * 1000).toLocaleString()} 开播`, true);
       boundary = setTimeout(
         sync,
@@ -272,7 +278,8 @@ async function sync() {
     }
     // 用往返耗时的一半估计单程延迟，将服务端进度校准到响应接收时刻。
     const delay = (received - sent) / 2000;
-    pending = { offset: data.offset + delay, received };
+    channelClock = { offset: data.offset + delay, received };
+    pending = channelClock;
     const nextIdentity = identity(data);
     if (
       sleepTimer?.type === 'program' &&
@@ -323,6 +330,21 @@ async function sync() {
 // playing 表示实际开始播放，此时才申请常亮；waiting 只是缓冲，不释放已有常亮锁。
 // pause / ended / error 都停止常亮；ended 还会立即查询时间线，尝试接入下一节目。
 video.addEventListener('loadedmetadata', applyPosition);
+// 画中画的进度条由浏览器提供，页面无法隐藏；用户拖动时立即拉回频道时间线。
+video.addEventListener('seeking', () => {
+  if (positioning || !channelClock || video.readyState < 1) return;
+  const target = channelClock.offset + (performance.now() - channelClock.received) / 1000;
+  if (!Number.isFinite(video.duration) || target >= video.duration) return;
+  try {
+    positioning = true;
+    video.currentTime = target;
+  } catch {
+    positioning = false;
+  }
+});
+video.addEventListener('seeked', () => {
+  positioning = false;
+});
 video.addEventListener('ended', () => {
   setScreenAwake(false);
   sync();
