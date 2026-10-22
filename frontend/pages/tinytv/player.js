@@ -7,6 +7,7 @@ import { requireUser, goToLogin } from '/assets/auth.mjs';
 // 页面元素与提示状态。
 const video = document.querySelector('#video');
 const status = document.querySelector('#status');
+const controlFeedback = document.querySelector('#control-feedback');
 const player = document.querySelector('#player');
 const enter = document.querySelector('#enter');
 const entry = document.querySelector('.entry');
@@ -15,9 +16,13 @@ const fullscreen = document.querySelector('#fullscreen');
 const controls = document.querySelector('#controls');
 const pictureInPicture = document.querySelector('#picture-in-picture');
 const pageFullscreen = document.querySelector('#page-fullscreen');
+const volumeBalanceButton = document.querySelector('#volume-balance');
+const brightnessButton = document.querySelector('#brightness');
+const brightnessPanel = document.querySelector('#brightness-panel');
+const brightnessRange = document.querySelector('#brightness-range');
 const sleepTimerButton = document.querySelector('#sleep-timer');
-const sleepTimerLabel = document.querySelector('#sleep-timer-label');
 const sleepTimerMenu = document.querySelector('#sleep-timer-menu');
+const sleepTimerStatus = document.querySelector('#sleep-timer-status');
 const cancelSleepTimerButton = sleepTimerMenu.querySelector('[data-cancel]');
 const programEndTimerButton = sleepTimerMenu.querySelector('[data-program-end]');
 let hideControls,
@@ -31,6 +36,129 @@ let screenLock = null, // 浏览器已授予的屏幕常亮锁；释放时需要
   screenLockRequest = null, // 正在等待的申请，避免多个播放事件重复申请。
   keepScreenAwake = false; // 播放状态是否需要常亮，与当前是否持有锁分开记录。
 let pageActive = true;
+let controlFeedbackTimeout = null;
+
+function showControlFeedback(message) {
+  clearTimeout(controlFeedbackTimeout);
+  controlFeedback.textContent = message;
+  controlFeedback.hidden = false;
+  controlFeedbackTimeout = setTimeout(() => {
+    controlFeedback.hidden = true;
+  }, 2200);
+}
+
+// 音量均衡按需创建一套音频图，并在后续切集时继续复用同一个 video source。
+// 默认走原声支路；开关只交叉调整两个 GainNode，不会暂停或重新定位视频。
+let audioContext = null,
+  audioSource = null,
+  originalGain = null,
+  compressedGain = null,
+  volumeBalanceEnabled = false;
+
+function setVolumeBalance(enabled) {
+  if (!audioContext || !originalGain || !compressedGain) return;
+  const now = audioContext.currentTime;
+  originalGain.gain.cancelScheduledValues(now);
+  compressedGain.gain.cancelScheduledValues(now);
+  originalGain.gain.setTargetAtTime(enabled ? 0 : 1, now, 0.01);
+  compressedGain.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.01);
+  volumeBalanceEnabled = enabled;
+  volumeBalanceButton.setAttribute('aria-pressed', String(enabled));
+  volumeBalanceButton.setAttribute('aria-label', enabled ? '关闭音量均衡' : '开启音量均衡');
+  volumeBalanceButton.title = enabled ? '关闭音量均衡' : '开启音量均衡';
+}
+
+async function ensureAudioGraph() {
+  if (audioSource) {
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    return;
+  }
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) throw new Error('Web Audio API unavailable');
+
+  // 先确认 AudioContext 能在当前用户手势中运行，再接管 video 的声音输出。
+  const context = new AudioContextClass();
+  try {
+    await context.resume();
+    if (context.state !== 'running') throw new Error('AudioContext could not start');
+  } catch (error) {
+    await context.close().catch(() => {});
+    throw error;
+  }
+
+  const dry = context.createGain();
+  const wet = context.createGain();
+  const makeup = context.createGain();
+  const compressor = context.createDynamicsCompressor();
+  dry.gain.value = 1;
+  wet.gain.value = 0;
+  // 较早介入并补回少量整体增益，让对白更清楚，同时温和收敛突发高峰。
+  compressor.threshold.value = -28;
+  compressor.knee.value = 14;
+  compressor.ratio.value = 5;
+  compressor.attack.value = 0.006;
+  compressor.release.value = 0.35;
+  makeup.gain.value = 1.2;
+
+  const source = context.createMediaElementSource(video);
+  source.connect(dry).connect(context.destination);
+  source.connect(compressor).connect(makeup).connect(wet).connect(context.destination);
+  audioContext = context;
+  audioSource = source;
+  originalGain = dry;
+  compressedGain = wet;
+}
+
+function disableVolumeBalanceControl() {
+  volumeBalanceButton.disabled = true;
+  volumeBalanceButton.setAttribute('aria-pressed', 'false');
+  volumeBalanceButton.setAttribute('aria-label', '当前浏览器无法使用音量均衡');
+  volumeBalanceButton.title = '当前浏览器无法使用音量均衡';
+}
+
+volumeBalanceButton.onclick = async () => {
+  try {
+    await ensureAudioGraph();
+    const enabled = !volumeBalanceEnabled;
+    setVolumeBalance(enabled);
+    showControlFeedback(
+      enabled ? '音量均衡已开启：压低突发大声' : '音量均衡已关闭：恢复原声'
+    );
+  } catch {
+    // 初始化前失败时停用辅助功能；已有音频图若恢复失败则保留重试入口。
+    if (audioSource) volumeBalanceButton.title = '音频恢复失败，请再次点击重试';
+    else disableVolumeBalanceControl();
+  }
+  revealControls();
+};
+
+function closeBrightnessPanel() {
+  brightnessPanel.hidden = true;
+  brightnessButton.setAttribute('aria-expanded', 'false');
+}
+
+brightnessButton.onclick = () => {
+  const opening = brightnessPanel.hidden;
+  closeSleepTimerMenu();
+  brightnessPanel.hidden = !opening;
+  brightnessButton.setAttribute('aria-expanded', String(opening));
+  if (opening) brightnessRange.focus();
+  revealControls();
+};
+brightnessRange.oninput = () => {
+  const brightness = Number(brightnessRange.value);
+  video.style.filter = `brightness(${brightness}%)`;
+  brightnessButton.setAttribute('aria-label', `画面亮度，当前 ${brightness}%`);
+  brightnessButton.title = `画面亮度 ${brightness}%`;
+  revealControls();
+};
+brightnessPanel.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  event.stopPropagation();
+  closeBrightnessPanel();
+  brightnessButton.focus();
+  revealControls();
+});
 
 // 定时关闭只保存在当前页面中。到时停止播放并释放屏幕常亮锁，不主动锁定设备。
 let sleepTimer = null,
@@ -42,16 +170,21 @@ function closeSleepTimerMenu() {
   sleepTimerButton.setAttribute('aria-expanded', 'false');
 }
 
-function updateSleepTimerLabel() {
+function updateSleepTimerButton() {
+  sleepTimerButton.classList.toggle('active', Boolean(sleepTimer));
   if (!sleepTimer) {
-    sleepTimerLabel.textContent = '定时关闭';
+    sleepTimerStatus.hidden = true;
+    sleepTimerStatus.textContent = '';
+    sleepTimerButton.setAttribute('aria-label', '定时关闭');
     sleepTimerButton.title = '定时关闭';
     cancelSleepTimerButton.hidden = true;
     return;
   }
   cancelSleepTimerButton.hidden = false;
+  sleepTimerStatus.hidden = false;
   if (sleepTimer.type === 'program') {
-    sleepTimerLabel.textContent = '本集结束';
+    sleepTimerStatus.textContent = '将在当前节目结束后关闭';
+    sleepTimerButton.setAttribute('aria-label', '当前节目结束后关闭');
     sleepTimerButton.title = '当前节目结束后关闭';
     return;
   }
@@ -59,7 +192,8 @@ function updateSleepTimerLabel() {
   const minutes = Math.floor(remaining / 60000);
   const seconds = Math.floor((remaining % 60000) / 1000);
   const text = `${minutes}:${String(seconds).padStart(2, '0')}`;
-  sleepTimerLabel.textContent = text;
+  sleepTimerStatus.textContent = `剩余 ${text}`;
+  sleepTimerButton.setAttribute('aria-label', `${text} 后关闭`);
   sleepTimerButton.title = `${text} 后关闭`;
 }
 
@@ -69,7 +203,7 @@ function clearSleepTimer() {
   clearInterval(sleepTimerTicker);
   sleepTimerTimeout = null;
   sleepTimerTicker = null;
-  updateSleepTimerLabel();
+  updateSleepTimerButton();
 }
 
 function stopForSleepTimer() {
@@ -85,8 +219,8 @@ function startMinuteSleepTimer(minutes) {
   clearSleepTimer();
   sleepTimer = { type: 'deadline', deadline: Date.now() + minutes * 60000 };
   sleepTimerTimeout = setTimeout(stopForSleepTimer, minutes * 60000);
-  sleepTimerTicker = setInterval(updateSleepTimerLabel, 1000);
-  updateSleepTimerLabel();
+  sleepTimerTicker = setInterval(updateSleepTimerButton, 1000);
+  updateSleepTimerButton();
 }
 
 function startProgramEndSleepTimer() {
@@ -94,7 +228,7 @@ function startProgramEndSleepTimer() {
   clearSleepTimer();
   // 播放地址可能在同一节目内刷新，节目开播时间才是稳定的节目轮次标识。
   sleepTimer = { type: 'program', programStart: currentProgramStart };
-  updateSleepTimerLabel();
+  updateSleepTimerButton();
 }
 
 // 播放事件只需声明是否需要常亮，锁的实际申请和释放统一在下面处理。
@@ -369,6 +503,7 @@ enter.onclick = () => {
   needsEntryPosition = true;
   setStatus('正在进入频道…', true);
   // 直接在点击处理函数中请求播放，满足浏览器的声音播放授权要求。
+  if (audioContext?.state === 'suspended') audioContext.resume().catch(() => {});
   playChannel();
   sync();
 };
@@ -416,6 +551,7 @@ pageFullscreen.onclick = () =>
 
 sleepTimerButton.onclick = () => {
   const opening = sleepTimerMenu.hidden;
+  closeBrightnessPanel();
   sleepTimerMenu.hidden = !opening;
   sleepTimerButton.setAttribute('aria-expanded', String(opening));
   programEndTimerButton.disabled = currentProgramStart === null;
@@ -430,11 +566,17 @@ sleepTimerMenu.onclick = (event) => {
   else startMinuteSleepTimer(Number(option.dataset.minutes));
   closeSleepTimerMenu();
   sleepTimerButton.focus();
+  if (sleepTimer) showControlFeedback(sleepTimerStatus.textContent);
+  else showControlFeedback('已取消定时关闭');
   revealControls();
 };
 document.addEventListener('pointerdown', (event) => {
   if (!controls.contains(event.target) && !sleepTimerMenu.hidden) {
     closeSleepTimerMenu();
+    revealControls();
+  }
+  if (!controls.contains(event.target) && !brightnessPanel.hidden) {
+    closeBrightnessPanel();
     revealControls();
   }
 });
@@ -450,6 +592,7 @@ sleepTimerMenu.addEventListener('keydown', (event) => {
 function canHideControls() {
   return (
     sleepTimerMenu.hidden &&
+    brightnessPanel.hidden &&
     entry.hidden &&
     !video.paused &&
     video.readyState >= 3 &&
