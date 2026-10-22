@@ -13,7 +13,12 @@ router = APIRouter(prefix='/api/tinytv', tags=['tinytv'], dependencies=[Depends(
 # 每次按当前配置文件和服务器时间计算节目，配置缺失或无效时对外统一表示频道不可用。
 def current_program():
     try:
-        return timeline(read_json('schedule.json'), read_json('sources.json'), time.time())
+        return timeline(
+            read_json('schedule.json'),
+            read_json('sources.json'),
+            time.time(),
+            media=read_json('media.json'),
+        )
     except (OSError, ValueError, KeyError, TypeError):
         raise HTTPException(503, 'Channel unavailable') from None
 

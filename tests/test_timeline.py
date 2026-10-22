@@ -48,7 +48,7 @@ class TimelineTests(unittest.TestCase):
         result = self.locate(100.5)
         self.assertEqual(result['episode'], 2)
         self.assertAlmostEqual(result['offset'], .25, places=5)
-        self.assertEqual(result['programs'][0]['duration'], 100.25)
+        self.assertEqual(result['upcoming'][0]['duration'], 100.25)
 
     def test_schedule_without_durations(self):
         for program in self.schedule['programs']:
@@ -56,7 +56,7 @@ class TimelineTests(unittest.TestCase):
                           for key in ('title', 'season', 'episode')))
             source['duration'] = program.pop('duration')
         result = self.locate(0)
-        self.assertEqual(result['duration'], result['programs'][0]['duration'])
+        self.assertEqual(result['duration'], result['upcoming'][0]['duration'])
         self.assertIn('duration', result['next'])
         self.assertTrue(all('duration' not in p for p in self.schedule['programs']))
 
@@ -100,7 +100,7 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(second['programStart'], start)
         self.assertEqual(second['programEnd'], start + 30)
         self.assertEqual(second['duration'], 30)
-        self.assertEqual(second['programs'][0]['duration'], 30)
+        self.assertEqual(second['upcoming'][0]['duration'], 30)
 
         next_episode = timeline(schedule, sources, start + 30)
         self.assertEqual(next_episode['episode'], 2)
@@ -126,6 +126,42 @@ class TimelineTests(unittest.TestCase):
                 source['parts'] = parts
                 with self.assertRaises(ValueError):
                     timeline(schedule, [source], start)
+
+    def test_adds_season_names_and_limits_upcoming_programs(self):
+        schedule = {
+            'channel': 'tiny',
+            'startTime': '2026-01-01T00:00:00+00:00',
+            'programs': [
+                {'title': 'show', 'season': 2, 'episode': episode}
+                for episode in range(1, 13)
+            ],
+        }
+        sources = [
+            {
+                'title': 'show',
+                'season': 2,
+                'episode': episode,
+                'path': f'/{episode}.mp4',
+                'duration': 10,
+            }
+            for episode in range(1, 13)
+        ]
+        media = [{'title': 'show', 'seasons': [{'season': 2, 'name': '特别篇'}]}]
+        start = datetime.fromisoformat(schedule['startTime']).timestamp()
+
+        result = timeline(schedule, sources, start + 115, media=media)
+
+        self.assertEqual(result['seasonName'], '特别篇')
+        self.assertEqual(result['next']['episode'], 1)
+        self.assertEqual(result['next']['seasonName'], '特别篇')
+        self.assertEqual(len(result['upcoming']), 11)
+        self.assertEqual([item['episode'] for item in result['upcoming'][:3]], [12, 1, 2])
+        self.assertTrue(all(item['seasonName'] == '特别篇' for item in result['upcoming']))
+        self.assertNotIn('programs', result)
+
+        without_name = timeline(schedule, sources, start, media=[])
+        self.assertNotIn('seasonName', without_name)
+        self.assertNotIn('seasonName', without_name['next'])
 
 
 if __name__ == '__main__':

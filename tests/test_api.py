@@ -132,6 +132,8 @@ class ApiTests(unittest.TestCase):
         response = self.client.get('/api/tinytv/channels/tiny/now')
         self.assertEqual(response.status_code, 200)
         self.assertNotIn('path', response.json())
+        self.assertNotIn('programs', response.json())
+        self.assertLessEqual(len(response.json()['upcoming']), 11)
         self.assertTrue(response.json()['playUrl'].startswith(self.settings.alist_url + '/d/'))
         self.assertIn('no-store', response.headers['cache-control'])
         self.assertTrue(all(r.url.host == 'pocketbase.cloverfrog.xyz' for r in self.requests))
