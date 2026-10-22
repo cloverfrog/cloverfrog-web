@@ -201,10 +201,10 @@ def load_json(path, label):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sources", type=Path, default=Path("backend/data/tinytv/sources.json"))
-    parser.add_argument("--output", type=Path, default=Path("backend/data/tinytv/schedule.json"))
-    parser.add_argument("--priorities", type=Path, help="可选的作品优先级 JSON 文件")
-    parser.add_argument("--mode", choices=("random", "continue"), default="random", help="random 完全随机；continue 延续旧节目表，默认 random")
-    parser.add_argument("--previous-schedule", type=Path, help="延续模式读取的旧节目表；默认与 --output 相同")
+    parser.add_argument("--output", type=Path, default=Path("backend/data/tinytv/schedule_new.json"))
+    parser.add_argument("--priorities", type=Path, default=Path("backend/data/tinytv/priorities.json"), help="可选的作品优先级 JSON 文件")
+    parser.add_argument("--mode", choices=("random", "continue"), default="continue", help="random 完全随机；continue 延续旧节目表，默认 continue")
+    parser.add_argument("--previous-schedule", type=Path, default=Path("backend/data/tinytv/schedule.json"), help="延续模式读取的旧节目表")
     parser.add_argument("--channel", default="tiny")
     parser.add_argument("--min-run", type=int, default=2, help="每次最少连播几集，默认 2")
     parser.add_argument("--max-run", type=int, default=3, help="每次最多连播几集，默认 3")
@@ -224,7 +224,7 @@ def main(argv=None):
         priorities = load_json(args.priorities, "优先级配置") if args.priorities else None
         starts = None
         if args.mode == "continue":
-            previous = load_json(args.previous_schedule or args.output, "旧节目表")
+            previous = load_json(args.previous_schedule, "旧节目表")
             starts = continuation_starts(previous, sources, start)
         programs, seconds = generate(sources, min_run=args.min_run, max_run=args.max_run, balance_alpha=args.balance_alpha, priorities=priorities, starts=starts, seed=args.seed)
         schedule = {"channel": args.channel, "startTime": start.isoformat(timespec="seconds"), "programs": programs}
