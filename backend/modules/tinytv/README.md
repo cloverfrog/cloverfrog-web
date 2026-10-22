@@ -15,7 +15,7 @@
 
 ## 节目与媒体源
 
-数据位于项目根目录 `data/tinytv/`，从项目根目录启动服务。每次查询重新读取数据，修改后下次请求生效；`media.json` 当前不参与频道时间线计算。
+数据位于项目根目录 `data/tinytv/`，从项目根目录启动服务。每次查询重新读取数据，修改后下次请求生效。`media.json` 中每部作品的 `seasons` 通过 `title + season` 与节目匹配，其中 `name` 作为前端显示的季名；未匹配到时前端回退显示季号。
 
 `schedule.json` 示例：
 
@@ -58,9 +58,9 @@
 
 | 方法与路径 | 用途 |
 | --- | --- |
-| `GET /api/tinytv/channels/tiny/now` | 认证后返回当前节目、当前文件内偏移和剩余时间、逻辑剧集剩余时间、分段序号、下一节目、循环节目单和 AList `/d/...` 地址 playUrl；开播前返回 waiting 与开播时间 |
+| `GET /api/tinytv/channels/tiny/now` | 认证后返回当前节目、季名、当前文件内偏移和剩余时间、逻辑剧集剩余时间、分段序号、下一节目、当前起最多 11 条节目和 AList `/d/...` 地址 playUrl；开播前返回 waiting 与开播时间 |
 
-播放状态中的 `offset`、`remaining` 对应当前视频文件，供播放器在 part 边界换源；`programStart`、`programEnd`、`programRemaining` 和 `duration` 对应完整逻辑剧集。`partIndex` 从 1 开始，`partCount` 是该集文件数，单文件剧集分别为 1 和 1。
+播放状态中的 `offset`、`remaining` 对应当前视频文件，供播放器在 part 边界换源；`programStart`、`programEnd`、`programRemaining` 和 `duration` 对应完整逻辑剧集。`partIndex` 从 1 开始，`partCount` 是该集文件数，单文件剧集分别为 1 和 1。`upcoming` 从当前节目开始，按频道循环顺序最多返回 11 条，避免向前端发送完整节目表。
 
 接口需要公共认证，响应禁止缓存。不再提供 `/api/tinytv/play/{key}` 接口。浏览器直接使用 playUrl 播放，AList 的下载重定向、Range 请求和视频传输均不经过本站后端。
 

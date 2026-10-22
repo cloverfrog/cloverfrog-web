@@ -41,14 +41,39 @@ def source_parts(source, legacy_duration=None):
     return parts
 
 
+def season_names(media):
+    """Index optional display names by the same title and season used by the schedule."""
+    names = {}
+    for item in media:
+        for season in item.get("seasons", []):
+            key = (item["title"], season["season"])
+            if key in names:
+                raise ValueError(f"Duplicate media season: {key}")
+            name = season["name"]
+            if not isinstance(name, str) or not name:
+                raise ValueError(f"Missing or invalid season name: {key}")
+            names[key] = name
+    return names
+
+
+def program_details(program, names):
+    """Return a client-facing program without modifying the generated schedule."""
+    result = dict(program)
+    name = names.get((program["title"], program["season"]))
+    if name:
+        result["seasonName"] = name
+    return result
+
+
 # 纯计算过程，不读取当前时钟或修改输入；调用方传入 now，方便查询任意时刻的播放位置。
-def timeline(schedule, sources, now):
+def timeline(schedule, sources, now, media=None):
     start = datetime.fromisoformat(schedule["startTime"])
     if start.utcoffset() is None:
         raise ValueError("startTime must include a timezone")
     scheduled = schedule["programs"]
     if not scheduled:
         raise ValueError("Empty schedule")
+    names = season_names(media or [])
     # 用作品、季、集定位资源，并在计算时间线前检查重复或缺失的资源。
     index = {}
     for source in sources:
@@ -88,8 +113,13 @@ def timeline(schedule, sources, now):
                 part_cursor = part_end
             else:
                 raise ValueError("Unable to locate source part")
+            upcoming = [
+                program_details(programs[(position + index) % len(programs)], names)
+                for index in range(min(11, len(programs)))
+            ]
+            current = program_details(program, names)
             return {
-                **program,
+                **current,
                 "channel": schedule["channel"],
                 "status": "playing",
                 "path": part["path"],
@@ -101,8 +131,8 @@ def timeline(schedule, sources, now):
                 "partIndex": part_index + 1,
                 "partCount": len(parts),
                 "serverTime": now,
-                "next": programs[(position + 1) % len(programs)],
-                "programs": programs,
+                "next": program_details(programs[(position + 1) % len(programs)], names),
+                "upcoming": upcoming,
             }
         cursor = end
     raise ValueError("Unable to locate program")

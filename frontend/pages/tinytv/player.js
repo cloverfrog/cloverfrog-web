@@ -216,7 +216,8 @@ let busy = false,
   positioning = false,
   started = false;
 let needsEntryPosition = false;
-const label = (program) => `${program.title} · 第 ${program.season} 季 第 ${program.episode} 集`;
+const label = (program) =>
+  `${program.title} · ${program.seasonName || `第 ${program.season} 季`} · 第 ${program.episode} 集`;
 const identity = (program) => `${program.programStart}:${program.playUrl}`;
 // 把播放器定位到频道此刻的进度；首次进入必须定位，播放中只纠正超过 30 秒的偏差。
 // 目标加上响应收到后的等待时间，避免视频加载完成时仍使用查询时的旧进度。
@@ -295,21 +296,8 @@ async function sync() {
     enter.disabled = false;
     document.querySelector('#current').textContent = label(data);
     document.querySelector('#next').textContent = `接下来：${label(data.next)}`;
-    const position = data.programs.findIndex(
-      (program) =>
-        program.title === data.title &&
-        program.season === data.season &&
-        program.episode === data.episode
-    );
-    const upcoming =
-      position < 0
-        ? [data, data.next]
-        : Array.from(
-            { length: Math.min(11, data.programs.length) },
-            (_, index) => data.programs[(position + index) % data.programs.length]
-          );
     document.querySelector('#programs').replaceChildren(
-      ...upcoming.map((program, index) => {
+      ...data.upcoming.map((program, index) => {
         const listItem = document.createElement('li');
         listItem.textContent = `${index === 0 ? '正在播放：' : ''}${label(program)} · ${program.duration.toFixed(2)} 秒`;
         listItem.classList.toggle('active', index === 0);
