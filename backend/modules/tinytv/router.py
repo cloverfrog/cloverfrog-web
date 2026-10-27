@@ -1,5 +1,6 @@
 # 登录验证后的频道接口直接返回时间线和 AList 下载地址。
 from urllib.parse import quote
+import logging
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -8,9 +9,10 @@ from auth.service import require_user
 from .timeline import read_json, timeline
 
 router = APIRouter(prefix='/api/tinytv', tags=['tinytv'], dependencies=[Depends(require_user)])
+logger = logging.getLogger(__name__)
 
 
-# 每次按当前配置文件和服务器时间计算节目，配置缺失或无效时对外统一表示频道不可用。
+# 每次按当前配置文件和服务器时间计算节目；数据错误保留服务端堆栈，对外只返回通用说明。
 def current_program():
     try:
         return timeline(
@@ -20,7 +22,8 @@ def current_program():
             media=read_json('media.json'),
         )
     except (OSError, ValueError, KeyError, TypeError):
-        raise HTTPException(503, 'Channel unavailable') from None
+        logger.exception('Failed to calculate current program for TinyTV channel tiny')
+        raise HTTPException(500, 'Channel unavailable') from None
 
 
 # 登录后直接返回 AList 下载地址，下载重定向和媒体传输由浏览器处理。

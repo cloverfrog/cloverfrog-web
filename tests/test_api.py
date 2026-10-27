@@ -4,6 +4,9 @@ import json
 import time
 import unittest
 from dataclasses import replace
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import httpx
 from fastapi.testclient import TestClient
@@ -138,6 +141,45 @@ class ApiTests(unittest.TestCase):
         self.assertIn('no-store', response.headers['cache-control'])
         self.assertTrue(all(r.url.host == 'pocketbase.cloverfrog.xyz' for r in self.requests))
         self.assertEqual(self.client.get('/api/tinytv/play/arbitrary').status_code, 404)
+
+    def test_channel_data_errors_return_500_and_log_traceback(self):
+        self.login()
+        schedule = {'channel': 'tiny', 'startTime': '2026-01-01T00:00:00+08:00',
+                    'programs': [{'title': 'Example', 'season': 1, 'episode': 1}]}
+        source = {'title': 'Example', 'season': 1, 'episode': 1,
+                  'path': 'private/video.mp4', 'duration': 600}
+        cases = (
+            ('missing file', 'schedule.json', None, FileNotFoundError),
+            ('invalid JSON', 'sources.json', '{private-invalid-json', json.JSONDecodeError),
+            ('missing source', 'sources.json', '[]', ValueError),
+            ('invalid duration', 'sources.json', json.dumps([{**source, 'duration': 0}]), ValueError),
+            ('missing field', 'schedule.json', '{}', KeyError),
+            ('invalid type', 'schedule.json', '[]', TypeError),
+            ('invalid media JSON', 'media.json', '{private-invalid-media', json.JSONDecodeError),
+        )
+        for name, filename, content, error_type in cases:
+            with self.subTest(name=name), TemporaryDirectory() as directory:
+                data_dir = Path(directory)
+                for file, data in (('schedule.json', schedule), ('sources.json', [source]), ('media.json', [])):
+                    (data_dir / file).write_text(json.dumps(data), encoding='utf-8')
+                if content is None:
+                    (data_dir / filename).unlink()
+                else:
+                    (data_dir / filename).write_text(content, encoding='utf-8')
+                with patch('modules.tinytv.timeline.DATA_DIR', data_dir), \
+                        self.assertLogs('modules.tinytv.router', level='ERROR') as logs:
+                    response = self.client.get('/api/tinytv/channels/tiny/now')
+                self.assertEqual(response.status_code, 500)
+                self.assertEqual(response.json(), {'detail': 'Channel unavailable'})
+                self.assertIn('no-store', response.headers['cache-control'])
+                self.assertEqual(len(logs.records), 1)
+                record = logs.records[0]
+                self.assertIn('channel tiny', record.getMessage())
+                self.assertIsNotNone(record.exc_info)
+                self.assertIsInstance(record.exc_info[1], error_type)
+                self.assertIsNotNone(record.exc_info[2])
+                self.assertIn('Traceback (most recent call last)', logs.output[0])
+                self.assertIn(str(record.exc_info[1]), logs.output[0])
 
     def test_direct_download_path_encoding(self):
         self.app.state.settings = replace(self.settings, alist_root='/baidu/影视 #?')
