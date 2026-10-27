@@ -38,7 +38,7 @@ python tools/tinytv/probe_durations.py --limit 3
 python tools/tinytv/probe_durations.py
 ```
 
-读取 `backend/.env` 的 `ALIST_URL`、`ALIST_ROOT`，通过 `/d/` 直链采集。命令行参数优先于环境变量，环境变量优先于 `backend/.env`。
+读取 `backend/.env` 的 `ALIST_URL`、`ALIST_ROOT` 和 `ALIST_TOKEN`，通过 `/d/` 直链采集。配置 token 时，每个待探测文件先调用 `/api/fs/get` 获取签名，再将带 `sign` 参数的地址交给 ffprobe；签名为空时使用普通直链，未配置 token 时保留直接拼接地址。API 失败记录为该文件采集失败，不降级为无签名地址，错误报告不包含 token 或上游响应。启用 Sign all 前必须配置有效 token。命令行参数优先于环境变量，环境变量优先于 `backend/.env`。
 
 | 文件 | 用途 |
 | --- | --- |

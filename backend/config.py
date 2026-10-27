@@ -1,6 +1,6 @@
 """Configuration independent of the working directory and checkout name."""
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -17,6 +17,7 @@ class Settings:
     dev_mode: bool = False
     alist_url: str = 'https://alist.cloverfrog.xyz'
     alist_root: str = ''
+    alist_token: str = field(default='', repr=False)
 
     @classmethod
     def load(cls):
@@ -28,6 +29,7 @@ class Settings:
             dev_mode=os.getenv('DEV_MODE', 'false').lower() == 'true',
             alist_url=os.getenv('ALIST_URL', cls.alist_url).rstrip('/'),
             alist_root=os.getenv('ALIST_ROOT', cls.alist_root).rstrip('/'),
+            alist_token=os.getenv('ALIST_TOKEN', ''),
         )
         # Origin 校验要求精确匹配，因此配置必须是纯来源地址，不能附带路径。
         origin = urlsplit(settings.public_origin)
