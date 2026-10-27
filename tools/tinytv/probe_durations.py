@@ -8,8 +8,9 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
+import httpx
 from dotenv import dotenv_values
 
 
@@ -102,8 +103,29 @@ def save_json(path, data):
         temporary.unlink(missing_ok=True)
 
 
-def direct_url(base, root, path):
-    return base.rstrip('/') + '/d' + quote(root.rstrip('/') + '/' + path.lstrip('/'), safe='/')
+def direct_url(base, root, path, token=''):
+    path = root.rstrip('/') + '/' + path.lstrip('/')
+    url = base.rstrip('/') + '/d' + quote(path, safe='/')
+    if not token:
+        return url
+    try:
+        response = httpx.post(
+            base.rstrip('/') + '/api/fs/get',
+            json={'path': path},
+            headers={'Authorization': token},
+            timeout=30,
+            follow_redirects=False,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict) or payload.get('code') != 200:
+            raise ValueError('Invalid AList business status')
+        data = payload.get('data')
+        if not isinstance(data, dict) or not isinstance(data.get('sign'), str):
+            raise ValueError('Invalid AList file metadata')
+    except (httpx.HTTPError, ValueError) as error:
+        raise ValueError(f'AList metadata request failed ({type(error).__name__})') from None
+    return url + ('?' + urlencode({'sign': data['sign']}) if data['sign'] else '')
 
 
 # 限制单文件探测时间，并只接受有效的正数时长，避免错误边界进入频道时间线。
@@ -168,6 +190,7 @@ def main(argv=None):
     env = dotenv_values('backend/.env')
     base = args.base_url or os.getenv('ALIST_URL') or env.get('ALIST_URL') or 'https://alist.cloverfrog.xyz'
     root = args.root if args.root is not None else os.getenv('ALIST_ROOT', env.get('ALIST_ROOT') or '')
+    token = os.getenv('ALIST_TOKEN', env.get('ALIST_TOKEN') or '')
     if urlsplit(base).scheme not in ('http', 'https') or not urlsplit(base).netloc:
         parser.error('AList URL must use HTTP or HTTPS')
     errors_path = args.output.with_name(args.output.stem + '.errors.json')
@@ -198,7 +221,7 @@ def main(argv=None):
             attempts += 1
             try:
                 source_file['duration'] = probe_duration(
-                    direct_url(base, root, source_file['path']), args.ffprobe, args.timeout
+                    direct_url(base, root, source_file['path'], token), args.ffprobe, args.timeout
                 )
                 completed += 1
                 suffix = f' part {part_index}/{part_count}' if part_count > 1 else ''

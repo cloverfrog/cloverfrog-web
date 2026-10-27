@@ -5,6 +5,7 @@ import json
 import subprocess
 import tempfile
 import unittest
+import httpx
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,6 +13,28 @@ from tools.tinytv import probe_durations as tool
 
 
 class ProbeTests(unittest.TestCase):
+    def setUp(self):
+        environment = patch.dict(tool.os.environ, {'ALIST_TOKEN': ''})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def test_signed_and_unsigned_download_urls(self):
+        for sign in ('', 'hash:123&+'):
+            response = httpx.Response(200, json={'code': 200, 'data': {'sign': sign}},
+                                      request=httpx.Request('POST', 'https://alist.example/api/fs/get'))
+            with patch.object(tool.httpx, 'post', return_value=response) as post:
+                url = httpx.URL(tool.direct_url('https://alist.example', '/影视', 'a #?.mp4', 'secret'))
+                self.assertEqual(url.params.get('sign', ''), sign)
+                self.assertIn(b'a%20%23%3F.mp4', url.raw_path)
+                self.assertEqual(post.call_args.kwargs['headers'], {'Authorization': 'secret'})
+                self.assertEqual(post.call_args.kwargs['json'], {'path': '/影视/a #?.mp4'})
+        for payload in ({'code': 403}, {'code': 200, 'data': {}}, []):
+            response = httpx.Response(200, json=payload,
+                                      request=httpx.Request('POST', 'https://alist.example/api/fs/get'))
+            with patch.object(tool.httpx, 'post', return_value=response):
+                with self.assertRaisesRegex(ValueError, 'AList metadata request failed'):
+                    tool.direct_url('https://alist.example', '', 'a.mp4', 'secret')
+
     def test_duration_parser_and_safe_failure(self):
         with patch.object(tool.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '{"format":{"duration":"10.12345678"}}')):
             self.assertEqual(tool.probe_duration('https://private.example'), 10.123457)

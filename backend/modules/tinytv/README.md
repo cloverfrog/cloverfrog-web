@@ -4,14 +4,19 @@
 
 ## 模块配置
 
-以下变量属于本模块，通过项目根目录 `.env` 加载：
+以下变量属于本模块，通过 `backend/.env` 加载，进程环境变量优先：
 
 | 配置 | 用途 |
 | --- | --- |
 | `ALIST_URL` | AList 服务地址，默认 `https://alist.cloverfrog.xyz` |
 | `ALIST_ROOT` | AList 影视挂载目录，可为空；与 sources.json 的 path 拼接 |
+| `ALIST_TOKEN` | 服务端固定 API token，用于获取文件签名；启用 Sign all 前必须配置 |
 
-频道接口将 `ALIST_URL + '/d' + ALIST_ROOT + '/' + path` 作为 playUrl 返回，路径按 URL 规则编码。浏览器直接请求 AList 并跟随其 302 重定向；后端不请求 AList，也不读取或转发视频。当前没有 AList 登录或访问 token 配置，源文件必须能通过配置的下载路径访问。
+频道接口将 `ALIST_URL + '/d' + ALIST_ROOT + '/' + path` 作为 playUrl，路径按 URL 规则编码。配置 `ALIST_TOKEN` 后，后端调用 AList `POST /api/fs/get` 获取 `data.sign`：非空时作为 `sign` 查询参数附加，空字符串时使用普通直链。未配置 token 时保留直接拼接地址的行为；仅配置用户名和密码不能替代后端 token。
+
+后端在内存中仅保存当前节目轮次、当前文件（含 part）使用的 URL，同一文件的后续频道查询复用它，切换文件或进入新一轮节目时重新获取。并发查询共用一次获取，服务重启后按需重新获取，不持久化、不定时续期。当前签名有效期为 4 小时，足够覆盖二十多分钟的视频；调整有效期或使用更长视频时需重新评估。
+
+AList HTTP 错误、超时、业务状态失败或缺少字符串类型的 sign 均返回 502 和 `{"detail":"Playback URL unavailable"}`，日志仅记录失败阶段、HTTP 状态及错误类型，不记录上游响应、请求头或异常正文。token 只用于该次元数据请求，不返回前端。浏览器直接请求 AList 并跟随其重定向，后端不读取或转发视频。本模块不修改 AList 设置或启用 Sign all。
 
 ## 节目与媒体源
 
@@ -72,6 +77,6 @@ AList 及重定向后的媒体源需要允许网站跨域读取（CORS），支�
 
 ## 验证
 
-`tests/test_timeline.py` 验证开播、节目及分段边界、循环和节目时长；`tests/test_api.py` 验证登录限制、AList 下载地址和路径编码，并确认频道接口不访问 AList 或媒体源，同时覆盖频道数据异常的 500 响应、通用错误信息和服务端异常堆栈日志。统一运行命令见[后端 README](../../README.md)。
+`tests/test_timeline.py` 验证开播、节目及分段边界、循环和节目时长；`tests/test_api.py` 验证登录限制、AList 下载地址和路径编码，并确认未配置 token 时不访问 AList、配置后仅获取文件元数据且复用当前 URL，不访问媒体源，同时覆盖空签名、签名编码、切换文件及轮次、上游错误和 token 隔离，以及频道数据异常的 500 响应、通用错误信息和服务端异常堆栈日志。统一运行命令见[后端 README](../../README.md)。
 
 真实联调时配置可访问的 AList 挂载和媒体源，使用普通账号登录前端，验证从当前进度播放、节目切换、视频编码支持和退出。
