@@ -270,3 +270,44 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(len(set(urls)), 1)
 
         asyncio.run(check())
+
+    def test_on_demand_requires_login_and_validates_paths(self):
+        path = '/api/tinytv/on-demand'
+        self.assertEqual(self.client.post(path, json={'path': 'test.mp4'}).status_code, 401)
+        self.login()
+        for source in ('', '  ', '../secret.mp4', 'a/../secret', 'a/./b', 'a//b', 'a\\b', 'a\x00b'):
+            with self.subTest(source=source):
+                self.assertEqual(self.client.post(path, json={'path': source}).status_code, 422)
+        with patch('modules.tinytv.router.current_program', side_effect=AssertionError):
+            response = self.client.post(path, json={'path': '/未编排/测试 #1.mp4'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('%E6%9C%AA', response.json()['playUrl'])
+        self.assertIn('%20%231.mp4', response.json()['playUrl'])
+        self.assertIn('no-store', response.headers['cache-control'])
+        self.assertTrue(all(r.url.host == 'pocketbase.cloverfrog.xyz' for r in self.requests))
+
+    def test_on_demand_signature_does_not_replace_live_cache(self):
+        self.login()
+        self.app.state.settings = replace(self.settings, alist_token='private-token', alist_root='/media')
+        program = {'status': 'playing', 'programStart': 100, 'partIndex': 1, 'path': 'live.mp4'}
+        with patch('modules.tinytv.router.current_program', side_effect=lambda: dict(program)):
+            live = self.client.get('/api/tinytv/channels/tiny/now').json()['playUrl']
+            cache = self.app.state.tinytv_playback_url
+            key = cache.key
+            self.alist_payload = {'code': 200, 'data': {'sign': 'vod:456'}}
+            response = self.client.post('/api/tinytv/on-demand', json={'path': 'unlisted.mp4'})
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('sign=vod%3A456', response.json()['playUrl'])
+            self.assertEqual(cache.key, key)
+            self.assertEqual(cache.url, live)
+            count = len([r for r in self.requests if r.url.path == '/api/fs/get'])
+            self.assertEqual(self.client.get('/api/tinytv/channels/tiny/now').json()['playUrl'], live)
+            self.assertEqual(len([r for r in self.requests if r.url.path == '/api/fs/get']), count)
+            metadata = [json.loads(r.content)['path'] for r in self.requests if r.url.path == '/api/fs/get']
+            self.assertEqual(metadata, ['/media/live.mp4', '/media/unlisted.mp4'])
+            self.alist_payload = {'code': 500, 'message': 'private upstream error'}
+            with self.assertLogs('modules.tinytv.router', level='ERROR'):
+                failed = self.client.post('/api/tinytv/on-demand', json={'path': 'missing.mp4'})
+            self.assertEqual(failed.status_code, 502)
+            self.assertEqual(failed.json(), {'detail': 'Playback URL unavailable'})
+            self.assertEqual(cache.url, live)
