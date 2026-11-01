@@ -4,12 +4,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="referrer" content="no-referrer" />
   <title>TinyTV · 固定频道</title>
-  <link rel="stylesheet" href="style.css?v=13" />
+  <link rel="stylesheet" href="style.css?v=14" />
   <main>
     <header>
       <a href="../../">cloverfrog</a>
       <h1>TinyTV</h1>
-      <span>LIVE · TINY</span>
+      <span id="mode-label">LIVE · TINY</span>
     </header>
     <!-- 原生视频、进入按钮、提示和播放控制由 player.js 协调。 -->
     <section id="player" aria-label="频道播放器" tabindex="0">
@@ -20,6 +20,13 @@
         playsinline
         preload="auto"
       ></video>
+      <div id="vod-controls" hidden>
+        <button type="button" id="vod-toggle">播放</button>
+        <button type="button" data-seek="-10" aria-label="后退 10 秒">−10秒</button>
+        <input id="vod-progress" type="range" min="0" max="0" step="0.1" value="0" aria-label="点播进度" disabled />
+        <button type="button" data-seek="10" aria-label="快进 10 秒">+10秒</button>
+        <button type="button" id="return-live">返回直播</button>
+      </div>
       <div class="entry">
         <button id="enter" disabled>
           <span aria-hidden="true">▶</span> <span id="enter-label">进入频道</span>
@@ -155,6 +162,15 @@
         </button>
       </div>
     </section>
+    <details id="vod-entry">
+      <summary>调试点播</summary>
+      <form id="vod-form">
+        <label for="vod-path">视频路径（相对于 ALIST_ROOT）</label>
+        <input id="vod-path" type="text" placeholder="示例节目/S01E01.mp4" maxlength="4096" required />
+        <button type="submit" disabled>播放点播</button>
+      </form>
+      <p>仅当前页面有效；刷新恢复直播。点播不改变频道时间线。</p>
+    </details>
     <h2 id="current">等待节目</h2>
     <p id="next"></p>
     <details>
@@ -162,5 +178,5 @@
       <ol id="programs"></ol>
     </details>
   </main>
-  <script type="module" src="player.js?v=13"></script>
+  <script type="module" src="player.js?v=14"></script>
 </html>

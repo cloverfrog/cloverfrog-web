@@ -6,6 +6,105 @@ import { requireUser, goToLogin } from '/assets/auth.mjs';
 
 // 页面元素与提示状态。
 const video = document.querySelector('#video');
+const vodForm = document.querySelector('#vod-form');
+const vodPath = document.querySelector('#vod-path');
+const vodControls = document.querySelector('#vod-controls');
+const vodToggle = document.querySelector('#vod-toggle');
+const vodProgress = document.querySelector('#vod-progress');
+let mode = 'live', modeVersion = 0;
+// 每次换模式/点播文件都使旧异步请求失效；旧 finally 也不能释放新请求的锁。
+function switchMode(nextMode) {
+  mode = nextMode;
+  modeVersion++;
+  busy = false;
+  clearTimeout(boundary);
+  pending = channelClock = current = currentProgramStart = null;
+  positioning = needsEntryPosition = false;
+  started = false;
+  playbackIssue = '';
+  if (sleepTimer?.type === 'program') clearSleepTimer();
+  clearVideo();
+  setScreenAwake(false);
+  vodControls.hidden = mode !== 'vod';
+  vodToggle.disabled = true;
+  vodProgress.value = 0;
+  vodProgress.disabled = true;
+  enter.disabled = true;
+  entry.hidden = true;
+  document.querySelector('#mode-label').textContent = mode === 'vod' ? '调试点播' : 'LIVE · TINY';
+  document.querySelector('#next').textContent = '';
+  document.querySelector('#programs').replaceChildren();
+  revealControls();
+}
+vodForm.onsubmit = async (event) => {
+  event.preventDefault();
+  if (!authenticated || !vodPath.value.trim()) return;
+  switchMode('vod');
+  const version = modeVersion;
+  document.querySelector('#current').textContent = `点播：${vodPath.value.trim()}`;
+  setStatus('正在获取点播地址…', true);
+  try {
+    const response = await fetch(API_URL + '/api/tinytv/on-demand', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: vodPath.value.trim() }),
+      signal: AbortSignal.timeout(10000)
+    });
+    if (version !== modeVersion || !authenticated) return;
+    if (response.status === 401) {
+      setAuthenticated(false);
+      goToLogin();
+      return;
+    }
+    if (!response.ok) throw new Error(`接口返回 ${response.status}，请检查文件路径和访问权限`);
+    const data = await response.json();
+    if (version !== modeVersion || !authenticated) return;
+    loadVideo(data.playUrl);
+    vodToggle.disabled = false;
+    enter.disabled = false;
+    started = true;
+    setStatus('正在加载点播视频…', true);
+    playChannel();
+  } catch (error) {
+    if (version === modeVersion) setStatus(`点播失败：${error.message}。可重试或返回直播。`, true);
+  }
+};
+document.querySelector('#return-live').onclick = () => {
+  switchMode('live');
+  vodPath.value = '';
+  started = true;
+  needsEntryPosition = true;
+  document.querySelector('#current').textContent = '正在返回直播…';
+  setStatus('正在同步直播…', true);
+  sync();
+};
+vodToggle.onclick = () => {
+  if (video.paused) {
+    started = true;
+    playChannel();
+  } else video.pause();
+};
+function seekOnDemand(seconds) {
+  if (mode !== 'vod' || video.readyState < 1 || !Number.isFinite(video.duration)) return;
+  video.currentTime = Math.max(0, Math.min(video.duration, seconds));
+}
+vodProgress.oninput = () => seekOnDemand(Number(vodProgress.value));
+for (const button of vodControls.querySelectorAll('[data-seek]')) {
+  button.onclick = () => seekOnDemand(video.currentTime + Number(button.dataset.seek));
+}
+function updateOnDemandControls() {
+  if (mode !== 'vod') return;
+  vodToggle.textContent = video.paused ? '播放' : '暂停';
+  const duration = video.duration;
+  vodProgress.disabled = !Number.isFinite(duration) || duration <= 0;
+  if (!vodProgress.disabled) {
+    vodProgress.max = duration;
+    vodProgress.value = video.currentTime;
+  }
+}
+for (const event of ['timeupdate', 'durationchange', 'loadedmetadata', 'play', 'pause', 'ended']) {
+  video.addEventListener(event, updateOnDemandControls);
+}
 const status = document.querySelector('#status');
 const controlFeedback = document.querySelector('#control-feedback');
 const player = document.querySelector('#player');
@@ -224,7 +323,7 @@ function startMinuteSleepTimer(minutes) {
 }
 
 function startProgramEndSleepTimer() {
-  if (currentProgramStart === null) return;
+  if (mode !== 'live' || currentProgramStart === null) return;
   clearSleepTimer();
   // 播放地址可能在同一节目内刷新，节目开播时间才是稳定的节目轮次标识。
   sleepTimer = { type: 'program', programStart: currentProgramStart };
@@ -281,17 +380,19 @@ function setStatus(message, attention = false) {
 function offerEntry(message) {
   playbackIssue = message;
   entry.hidden = false;
-  enterLabel.textContent = '重新进入';
+  enterLabel.textContent = mode === 'vod' ? '重试点播' : '重新进入';
   setStatus(message, true);
 }
 function playChannel() {
+  const version = modeVersion;
   video.play().catch((error) => {
+    if (version !== modeVersion) return;
     // 切集会取消旧节目的播放请求，这是正常换源，不应提示用户重新进入。
     if (error.name === 'AbortError') return;
     if (!authenticated || !started) return;
     started = false;
     setScreenAwake(false);
-    offerEntry('播放未能开始，请点击重新进入频道。');
+    offerEntry(mode === 'vod' ? '播放未能开始，请点击重试点播。' : '播放未能开始，请点击重新进入频道。');
   });
 }
 
@@ -315,9 +416,12 @@ try {
 } catch {}
 function setAuthenticated(value) {
   authenticated = value;
+  vodForm.querySelector('button').disabled = !value;
   // 登录成功后仍需等节目地址写入原生 video，避免用户点击时还没有可播放的媒体。
   enter.disabled = true;
   if (!value) {
+    modeVersion++;
+    busy = false;
     clearSleepTimer();
     setScreenAwake(false);
     started = false;
@@ -356,7 +460,7 @@ const identity = (program) => `${program.programStart}:${program.playUrl}`;
 // 把播放器定位到频道此刻的进度；首次进入必须定位，播放中只纠正超过 30 秒的偏差。
 // 目标加上响应收到后的等待时间，避免视频加载完成时仍使用查询时的旧进度。
 function applyPosition() {
-  if (!pending || video.readyState < 1) return;
+  if (mode !== 'live' || !pending || video.readyState < 1) return;
   const target = pending.offset + (performance.now() - pending.received) / 1000;
   if (Number.isFinite(video.duration) && target >= video.duration) {
     setStatus('视频已结束，等待节目时间线切换；请核对节目时长。', true);
@@ -380,7 +484,8 @@ function applyPosition() {
 
 // 查询当前节目、更新节目单，并安排节目边界的下一次查询；定时轮询负责兜底校准。
 async function sync() {
-  if (busy || !authenticated) return;
+  if (mode !== 'live' || busy || !authenticated || !pageActive) return;
+  const version = modeVersion;
   busy = true;
   try {
     const sent = performance.now();
@@ -388,6 +493,7 @@ async function sync() {
       cache: 'no-store',
       signal: AbortSignal.timeout(10000)
     });
+    if (version !== modeVersion || !authenticated) return;
     if (response.status === 401) {
       setAuthenticated(false);
       goToLogin();
@@ -395,7 +501,7 @@ async function sync() {
     }
     if (!response.ok) throw new Error(`接口返回 ${response.status}`);
     const data = await response.json();
-    if (!authenticated) return;
+    if (!authenticated || version !== modeVersion) return;
     const received = performance.now();
     clearTimeout(boundary);
     if (data.status === 'waiting') {
@@ -443,9 +549,10 @@ async function sync() {
     applyPosition();
     boundary = setTimeout(sync, Math.max(100, (data.remaining - delay) * 1000 + 50));
   } catch (error) {
+    if (version !== modeVersion) return;
     setStatus(`同步失败：${error.message}。稍后自动重试。`, true);
   } finally {
-    busy = false;
+    if (version === modeVersion) busy = false;
   }
 }
 // 播放状态与观看体验的联动。
@@ -454,7 +561,7 @@ async function sync() {
 video.addEventListener('loadedmetadata', applyPosition);
 // 画中画的进度条由浏览器提供，页面无法隐藏；用户拖动时立即拉回频道时间线。
 video.addEventListener('seeking', () => {
-  if (positioning || !channelClock || video.readyState < 1) return;
+  if (mode !== 'live' || positioning || !channelClock || video.readyState < 1) return;
   const target = channelClock.offset + (performance.now() - channelClock.received) / 1000;
   if (!Number.isFinite(video.duration) || target >= video.duration) return;
   try {
@@ -493,11 +600,19 @@ video.addEventListener('error', () => {
   setScreenAwake(false);
   if (authenticated) {
     current = null;
-    offerEntry(video.error?.message || '视频加载失败，请重新进入频道。');
+    offerEntry(video.error?.message || (mode === 'vod' ? '点播视频加载失败，请检查路径或格式，可返回直播。' : '视频加载失败，请重新进入频道。'));
   }
 });
 
 enter.onclick = () => {
+  if (mode === 'vod') {
+    playbackIssue = '';
+    started = true;
+    if (video.error) loadVideo(video.src);
+    // 直接在用户点击中重试，保留浏览器的播放授权。
+    playChannel();
+    return;
+  }
   playbackIssue = '';
   started = true;
   needsEntryPosition = true;
@@ -554,7 +669,7 @@ sleepTimerButton.onclick = () => {
   closeBrightnessPanel();
   sleepTimerMenu.hidden = !opening;
   sleepTimerButton.setAttribute('aria-expanded', String(opening));
-  programEndTimerButton.disabled = currentProgramStart === null;
+  programEndTimerButton.disabled = mode !== 'live' || currentProgramStart === null;
   if (opening) sleepTimerMenu.querySelector('button:not([hidden]):not(:disabled)')?.focus();
   revealControls();
 };
@@ -696,6 +811,9 @@ requireUser()
 // 离开页面时停止常亮并释放播放器；pageActive 防止迟到的申请重新持有常亮锁。
 window.addEventListener('pagehide', () => {
   pageActive = false;
+  modeVersion++;
+  busy = false;
+  clearTimeout(boundary);
   clearSleepTimer();
   setScreenAwake(false);
   clearVideo();

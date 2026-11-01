@@ -351,3 +351,52 @@ body.player-expanded {
     transition: none;
   }
 }
+
+/* 点播操作在播放器内，全屏时仍可拖动进度和返回直播。 */
+#vod-controls {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 8px;
+  background: #172028e8;
+}
+#vod-controls[hidden] {
+  display: none;
+}
+#vod-controls button,
+#vod-form button {
+  padding: 8px;
+  border-radius: 6px;
+  background: #98e4b9;
+  color: #13251c;
+  white-space: nowrap;
+}
+#vod-progress {
+  flex: 1;
+  min-width: 24px;
+  accent-color: #98e4b9;
+}
+#vod-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+#vod-form label {
+  width: 100%;
+}
+#vod-path {
+  flex: 1;
+  min-width: 160px;
+  padding: 10px;
+  border: 1px solid #52616d;
+  border-radius: 6px;
+  font: inherit;
+}
+#current {
+  overflow-wrap: anywhere;
+}

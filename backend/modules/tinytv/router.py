@@ -6,6 +6,7 @@ import time
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from auth.service import require_user
 from .timeline import read_json, timeline
@@ -86,3 +87,22 @@ async def now(request: Request):
             request.app.state.http, settings, result, source,
         )
     return result
+
+
+class OnDemandRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=4096)
+
+
+@router.post('/on-demand')
+async def on_demand(request: Request, body: OnDemandRequest):
+    source = body.path.strip().lstrip('/')
+    # 只接受挂载目录内的文件路径，避免 URL 规范化后越过 ALIST_ROOT。
+    if (not source or '\\' in source or any(ord(char) < 32 for char in source)
+            or any(part in ('.', '..', '') for part in source.split('/'))):
+        raise HTTPException(422, 'Invalid video path')
+    # 点播不占用或替换频道当前文件的签名缓存，也不读取节目编排。
+    url = await PlaybackURL().get(
+        request.app.state.http, request.app.state.settings,
+        {'programStart': None, 'partIndex': None}, source,
+    )
+    return {'playUrl': url}
