@@ -232,3 +232,42 @@ class CollectionTests(unittest.TestCase):
                 resource_url('http://media.example/base', path)
         self.assertEqual(resource_url('http://media.example/base', 'x/图 片.png'),
                          'http://media.example/base/x/%E5%9B%BE%20%E7%89%87.png')
+
+    def test_404_diagnostics_distinguish_type_record_and_gateway(self):
+        self.login()
+        cases = [
+            ('empty_types', True, self.base, 'type_lookup', 'type_not_visible', None),
+            ('type_status', 404, self.base, 'type_view', 'type_view_failed', 404),
+            ('record_status', 404, self.base + '/items', 'item_list', 'item_list_failed', 404),
+            ('record_status', 404, self.media, 'item_view', 'item_view_failed', 404),
+            ('image_status', 404, self.media, 'media_fetch', 'media_http_error', 404),
+        ]
+        for attribute, value, path, stage, code, upstream_status in cases:
+            previous = getattr(self, attribute)
+            setattr(self, attribute, value)
+            with self.subTest(stage=stage), self.assertLogs('modules.collection.errors', level='WARNING') as logs:
+                response = self.client.get(path)
+            setattr(self, attribute, previous)
+            self.assertEqual(response.status_code, 404)
+            detail = response.json()['detail']
+            self.assertEqual(detail['stage'], stage)
+            self.assertEqual(detail['code'], code)
+            self.assertEqual(detail.get('upstream_status'), upstream_status)
+            self.assertIn(detail['request_id'], logs.output[0])
+            for secret in ('media.example', '图 片', 'private-user', token(marker='refreshed')):
+                self.assertNotIn(secret, response.text)
+            self.assertNotIn(token(marker='refreshed'), logs.output[0])
+            if stage == 'media_fetch':
+                self.assertIn('media.example/internal/', logs.output[0])
+            if stage == 'item_list':
+                self.assertIn('example/records', logs.output[0])
+
+    def test_invalid_config_logs_validation_location_without_private_values(self):
+        self.login()
+        self.type_record['display']['properties'][0]['format'] = 'private-invalid-format'
+        with self.assertLogs('modules.collection.errors', level='WARNING') as logs:
+            response = self.client.get(self.base)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()['detail']['code'], 'display_invalid')
+        self.assertIn('properties.0.format', logs.output[0])
+        self.assertNotIn('private-invalid-format', response.text + logs.output[0])

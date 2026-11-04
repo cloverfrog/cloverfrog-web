@@ -92,6 +92,14 @@ Create/Update/Delete 保持 **locked**。配置由管理员在后台维护，不
 
 401 表示认证失效，前端清空内容并进入公共登录页；403/404 显示无权限或内容不存在；429 提示稍后重试；422 表示参数错误；存储、网关临时故障及配置错误返回 503。不回显上游错误详情。PocketBase List Rule 可以返回 200 空列表，不能据此区分“没有记录”和“没有可见记录”；View Rule 不满足通常返回 404。
 
+### 错误定位
+
+模块业务错误的 JSON `detail` 包含 `code`、`message`、`stage`、`request_id`，上游返回错误状态时还包含 `upstream_status`。页面及封面失败提示显示这些诊断信息与失败的本站 API 路径。公共认证和框架错误可能仍返回字符串 detail；若返回 HTML 或通用 404，页面会提示检查后端版本与 API 代理。
+
+按 `stage` 定位：`type_list` / `type_lookup` 检查注册表、类型 key、allowed_users 和 List Rule；`type_view` 检查注册记录的 View Rule；`item_list` 检查与 key 同名的业务表和 List Rule；`item_view` 检查记录及 View Rule；`display_config` 检查展示映射；`resource_config` / `resource_lookup` 检查网关和资源字段；`media_fetch` 检查媒体请求。
+
+后端以 `collection_error` 记录 warning，可按页面的 `request_id` 搜索服务日志。日志包含失败阶段、本站请求路径、实际 PocketBase 目标路径或拼接后的媒体 URL、上游状态，以及展示配置校验位置/错误类型。日志不记录凭据、请求头、查询参数、上游响应正文或完整配置。实际目标路径只留在私有服务器日志，不在 API 错误中返回。404 仍不能断言记录不存在还是被规则隐藏，提示会列出应检查的配置，不绕过权限进行探测。
+
 ## 配置与验收
 
 没有模块专用环境变量，使用已有 PocketBase 与公共认证配置。配置随请求从数据库读取。后端启动和依赖见[后端说明](../../README.md)。

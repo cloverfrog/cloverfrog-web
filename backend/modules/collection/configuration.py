@@ -4,8 +4,9 @@ from typing import Literal
 from urllib.parse import quote, urlsplit, urlunsplit
 
 import httpx
-from fastapi import HTTPException
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+
+from .errors import fail
 
 KEY = re.compile(r'[a-zA-Z0-9_][a-zA-Z0-9_-]{0,63}')
 FIELD = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]{0,63}')
@@ -50,14 +51,19 @@ class Display(BaseModel):
         return self
 
 
-def configuration(record):
+def configuration(record, request=None):
     try:
         return Display.model_validate(record['display'])
+    except ValidationError as error:
+        problems = ', '.join('.'.join(str(part) for part in item['loc']) + ': ' + item['msg']
+                             for item in error.errors(include_input=False, include_context=False))
+        fail(request, 503, 'display_invalid', '展示配置无效，请检查 display 的字段映射和资源槽位。',
+             stage='display_config', reason=problems)
     except (KeyError, ValueError, TypeError):
-        raise HTTPException(503, 'Invalid collection configuration') from None
+        fail(request, 503, 'display_missing', '类型缺少有效的 display 展示配置。', stage='display_config')
 
 
-def resource_url(gateway, path):
+def resource_url(gateway, path, request=None):
     """Only join a raw relative path to the administrator-configured gateway."""
     try:
         base = urlsplit(gateway)
@@ -75,7 +81,8 @@ def resource_url(gateway, path):
         httpx.URL(url)  # Reject malformed hosts before constructing an upstream request.
         return url
     except (ValueError, TypeError, AttributeError, httpx.InvalidURL):
-        raise HTTPException(503, 'Invalid resource configuration') from None
+        fail(request, 503, 'resource_config_invalid',
+             '媒体网关或相对路径配置无效，请检查 media_gateway 和资源字段。', stage='resource_config')
 
 
 def display_value(value, kind='text'):

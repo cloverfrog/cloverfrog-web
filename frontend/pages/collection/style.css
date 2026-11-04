@@ -20,7 +20,8 @@ h2 { font-size: 1.1rem; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
 .type-action { color: var(--muted); font-size: .85rem; }
 .cover { aspect-ratio: 4 / 3; background: var(--line); display: grid; place-items: center; position: relative; }
 .cover img { width: 100%; height: 100%; object-fit: contain; position: absolute; inset: 0; }
-.placeholder { color: var(--muted); font-size: .85rem; }
+.placeholder { color: var(--muted); font-size: .85rem; padding: 16px; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+#status { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
 .card-body { padding: 20px; }
 .identifier { font-size: .85rem; margin: 6px 0 16px; overflow-wrap: anywhere; }
 .attributes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px 14px; font-size: .85rem; margin: 0; }

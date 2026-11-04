@@ -103,3 +103,35 @@ test('翻页释放图片，旧请求的迟到错误不会清除新页面', async
   assert.equal(h.redirects(), 0);
   assert.equal(h.get('status').textContent, '暂无可见内容。');
 });
+
+test('页面显示接口错误阶段、上游状态与关联编号', async () => {
+  const h = pageHarness();
+  await h.settle();
+  h.respond(0, { detail: { message: '类型配置读取失败', stage: 'type_view', code: 'type_view_failed',
+    upstream_status: 404, request_id: 'trace-example' } }, 404);
+  await h.settle();
+  const text = h.get('status').textContent;
+  for (const expected of ['类型配置读取失败', 'HTTP 404', 'type_view', 'trace-example', '/api/collection/types/demo']) {
+    assert.ok(text.includes(expected));
+  }
+  assert.equal(h.get('retry').hidden, false);
+});
+
+test('图片失败保留媒体诊断，通用路由404提示检查部署', async () => {
+  const h = pageHarness();
+  await h.settle(); h.respond(0, h.config);
+  await h.settle(); h.respond(1, h.items);
+  await h.settle();
+  h.respond(2, { detail: { message: '媒体网关返回错误', stage: 'media_fetch',
+    code: 'media_http_error', upstream_status: 404, request_id: 'media-trace' } }, 404);
+  await h.settle();
+  const placeholder = h.get('content').children[0].children[0].children[0];
+  assert.ok(placeholder.textContent.includes('媒体网关返回错误'));
+  assert.ok(placeholder.textContent.includes('media-trace'));
+  const other = pageHarness();
+  await other.settle();
+  other.respond(0, { detail: 'Not Found' }, 404);
+  await other.settle();
+  assert.ok(other.get('status').textContent.includes('后端已更新'));
+  assert.ok(other.get('status').textContent.includes('HTTP 404'));
+});

@@ -23,12 +23,19 @@ function expired() {
   goToLogin();
 }
 
-function failure(status) {
-  return new Error(status === 403 ? '没有访问权限。'
-    : status === 404 ? '内容不存在或你没有访问权限。'
+function failure(status, detail, path) {
+  const fallback = status === 403 ? '没有访问权限，请检查 PocketBase API Rules。'
+    : status === 404 ? '请求地址未找到，请确认后端已更新、API 代理正确且类型已注册。'
     : status === 429 ? '请求过于频繁，请稍后重试。'
     : status === 422 ? '请求参数无效，请检查页面地址。'
-    : '服务暂时不可用，或类型配置有误，请稍后重试。');
+    : '服务暂时不可用，请检查后端日志。';
+  const info = detail && typeof detail === 'object' ? detail : {};
+  const message = typeof info.message === 'string' ? info.message : fallback;
+  const diagnostics = [`HTTP ${status}`, path];
+  for (const field of ['stage', 'code', 'upstream_status', 'request_id']) {
+    if (['string', 'number'].includes(typeof info[field])) diagnostics.push(`${field}=${info[field]}`);
+  }
+  return new Error(message + '\n' + diagnostics.join(' · '));
 }
 
 async function api(path, signal, image = false) {
@@ -41,7 +48,10 @@ async function api(path, signal, image = false) {
     expired();
     throw new DOMException('Session expired', 'AbortError');
   }
-  if (!response.ok) throw failure(response.status);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw failure(response.status, body?.detail, path);
+  }
   return image ? response.blob() : response.json();
 }
 
@@ -86,7 +96,7 @@ function itemCard(item, properties, signal) {
       img.src = url;
       cover.append(img);
     }).catch((error) => {
-      if (error.name !== 'AbortError' && !signal.aborted) placeholder.textContent = '图片加载失败';
+      if (error.name !== 'AbortError' && !signal.aborted) placeholder.textContent = '图片加载失败：' + error.message;
     });
   }
   return card;
