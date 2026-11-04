@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from auth.router import router as auth_router
 from auth.service import COOKIE_NAME, LoginLimiter
 from config import Settings
+from modules.collection.router import router as collection_router
 from modules.tinytv.router import router as tinytv_router
 from modules.scratchpad.router import router as scratchpad_router
 
@@ -69,6 +70,7 @@ def create_app(settings=None, *, transport=None):
     app.include_router(auth_router)
     app.include_router(tinytv_router)
     app.include_router(scratchpad_router)
+    app.include_router(collection_router)
     return app
 
 

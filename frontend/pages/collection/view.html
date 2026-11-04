@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Collection</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body data-page="items">
+  <main>
+    <header><a class="back" href="./index.html">← 收藏类型</a><p class="eyebrow">COLLECTION</p>
+      <h1 id="heading">收藏</h1><p class="subtitle">浏览收藏条目</p></header>
+    <div class="status" role="status" aria-live="polite"><span id="status">正在连接…</span>
+      <button id="retry" hidden>重试</button></div>
+    <section id="content" class="grid" aria-label="收藏条目" aria-busy="true"></section>
+    <nav class="pagination" aria-label="分页" hidden id="pagination">
+      <button id="previous">上一页</button><span id="page-label"></span><button id="next">下一页</button>
+    </nav>
+  </main>
+</body>
+</html>
