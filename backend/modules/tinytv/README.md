@@ -86,3 +86,9 @@ AList 及重定向后的媒体源需要允许网站跨域读取（CORS），支�
 `tests/test_timeline.py` 验证开播、节目及分段边界、循环和节目时长；`tests/test_api.py` 验证登录限制、AList 下载地址和路径编码，并确认未配置 token 时不访问 AList、配置后仅获取文件元数据且复用当前 URL，不访问媒体源，同时覆盖空签名、签名编码、切换文件及轮次、上游错误和 token 隔离，以及频道数据异常的 500 响应、通用错误信息和服务端异常堆栈日志。API 测试还覆盖点播登录限制、路径校验、签名获取、错误响应和直播缓存隔离。从 `backend/` 运行 `PYTHONPATH=.:.. python -m unittest tests.test_api -v`（PowerShell 先设置 `$env:PYTHONPATH=".;.."`）。
 
 真实联调时配置可访问的 AList 挂载和媒体源，使用普通账号登录前端，验证从当前进度播放、节目切换、视频编码支持和退出。
+
+## 节目过渡
+
+每个逻辑剧集后固定保留 10 秒（包括循环末尾），part 之间仍无间隔。`programEnd` 是媒体记录的结束时刻，`transitionEnd` 是下一节目开播时刻；循环周期包含所有过渡时间。
+
+过渡时 `status` 为 `transition`，当前节目、`path`/`playUrl` 保留上一集最后一个 part，`offset` 停在文件末尾，`programRemaining` 为 0，`remaining` 表示过渡剩余秒数。`nextPlayback` 提供下一节目开头的完整播放数据及签名地址，供单播放器在片尾结束后加载；播放阶段该字段为 null。过渡期间节目单仍以刚结束的节目为首项。

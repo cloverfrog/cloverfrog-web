@@ -1,13 +1,22 @@
-# 验证开播前、节目边界、循环和资源时长优先级；样例来自本地 data/tinytv 节目表与资源清单。
+# 验证开播前、节目边界、循环和资源时长优先级；使用独立样例，不依赖私有媒体清单。
 import unittest
 from datetime import datetime
-from modules.tinytv.timeline import read_json, timeline
+from modules.tinytv.timeline import timeline
 
 
 class TimelineTests(unittest.TestCase):
     def setUp(self):
-        self.schedule = read_json('schedule.json')
-        self.sources = read_json('sources.json')
+        self.schedule = {
+            'channel': 'tiny', 'startTime': '2026-01-01T00:00:00+08:00',
+            'programs': [
+                {'title': 'show', 'season': 1, 'episode': episode, 'duration': 600}
+                for episode in (1, 2, 3)
+            ],
+        }
+        self.sources = [
+            {'title': 'show', 'season': 1, 'episode': episode, 'path': f'S01E{episode:02}.mp4'}
+            for episode in (1, 2, 3)
+        ]
         self.start = datetime.fromisoformat(self.schedule['startTime']).timestamp()
 
     def locate(self, elapsed):
@@ -24,12 +33,25 @@ class TimelineTests(unittest.TestCase):
     def test_boundary_and_offset(self):
         duration = self.schedule['programs'][0]['duration']
         self.assertEqual(self.locate(duration - .01)['episode'], 1)
-        result = self.locate(duration + .01)
+        result = self.locate(duration + 10 + .01)
         self.assertEqual(result['episode'], 2)
         self.assertAlmostEqual(result['offset'], .01, places=5)
 
+    def test_transition_retains_current_and_prepares_next(self):
+        duration = self.schedule['programs'][0]['duration']
+        result = self.locate(duration)
+        self.assertEqual(result['status'], 'transition')
+        self.assertEqual(result['episode'], 1)
+        self.assertEqual(result['remaining'], 10)
+        self.assertEqual(result['programRemaining'], 0)
+        self.assertEqual(result['nextPlayback']['episode'], 2)
+        self.assertEqual(result['nextPlayback']['offset'], 0)
+        self.assertEqual(result['nextPlayback']['programStart'], result['transitionEnd'])
+        self.assertEqual(self.locate(duration + 9.99)['status'], 'transition')
+        self.assertEqual(self.locate(duration + 10)['status'], 'playing')
+
     def test_loop(self):
-        total = sum(p['duration'] for p in self.schedule['programs'])
+        total = sum(p['duration'] + 10 for p in self.schedule['programs'])
         result = self.locate(total * 100 + 120)
         self.assertEqual(result['episode'], 1)
         self.assertAlmostEqual(result['offset'], 120, places=4)
@@ -45,10 +67,10 @@ class TimelineTests(unittest.TestCase):
                       and item['season'] == self.schedule['programs'][0]['season']
                       and item['episode'] == self.schedule['programs'][0]['episode'])
         source['duration'] = 100.25
-        result = self.locate(100.5)
+        result = self.locate(110.5)
         self.assertEqual(result['episode'], 2)
         self.assertAlmostEqual(result['offset'], .25, places=5)
-        self.assertEqual(result['upcoming'][0]['duration'], 100.25)
+        self.assertEqual(self.locate(100)['duration'], 100.25)
 
     def test_schedule_without_durations(self):
         for program in self.schedule['programs']:
@@ -102,11 +124,11 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(second['duration'], 30)
         self.assertEqual(second['upcoming'][0]['duration'], 30)
 
-        next_episode = timeline(schedule, sources, start + 30)
+        next_episode = timeline(schedule, sources, start + 40)
         self.assertEqual(next_episode['episode'], 2)
         self.assertEqual(next_episode['partIndex'], 1)
 
-        looped = timeline(schedule, sources, start + 35)
+        looped = timeline(schedule, sources, start + 55)
         self.assertEqual((looped['episode'], looped['path'], looped['offset']), (1, '/a.mp4', 0))
 
     def test_rejects_invalid_multipart_source(self):
@@ -149,7 +171,7 @@ class TimelineTests(unittest.TestCase):
         media = [{'title': 'show', 'seasons': [{'season': 2, 'name': '特别篇'}]}]
         start = datetime.fromisoformat(schedule['startTime']).timestamp()
 
-        result = timeline(schedule, sources, start + 115, media=media)
+        result = timeline(schedule, sources, start + 225, media=media)
 
         self.assertEqual(result['seasonName'], '特别篇')
         self.assertEqual(result['next']['episode'], 1)

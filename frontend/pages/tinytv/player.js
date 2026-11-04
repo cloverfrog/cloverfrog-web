@@ -19,6 +19,8 @@ function switchMode(nextMode) {
   busy = false;
   clearTimeout(boundary);
   pending = channelClock = current = currentProgramStart = null;
+  introIdentity = null;
+  inTransition = false;
   positioning = needsEntryPosition = false;
   started = false;
   playbackIssue = '';
@@ -426,6 +428,8 @@ function setAuthenticated(value) {
     setScreenAwake(false);
     started = false;
     current = null;
+    introIdentity = null;
+    inTransition = false;
     currentProgramStart = null;
     pending = null;
     channelClock = null;
@@ -454,14 +458,16 @@ let busy = false,
   positioning = false,
   started = false;
 let needsEntryPosition = false;
+let introIdentity = null, inTransition = false, finalPart = true;
 const label = (program) =>
   `${program.title} · ${program.seasonName || `第 ${program.season} 季`} · 第 ${program.episode} 集`;
 const identity = (program) => `${program.programStart}:${program.playUrl}`;
 // 把播放器定位到频道此刻的进度；首次进入必须定位，播放中只纠正超过 30 秒的偏差。
 // 目标加上响应收到后的等待时间，避免视频加载完成时仍使用查询时的旧进度。
 function applyPosition() {
-  if (mode !== 'live' || !pending || video.readyState < 1) return;
-  const target = pending.offset + (performance.now() - pending.received) / 1000;
+  if (mode !== 'live' || inTransition || !pending || video.readyState < 1) return;
+  const target = needsEntryPosition && introIdentity === current
+    ? 0 : pending.offset + (performance.now() - pending.received) / 1000;
   if (Number.isFinite(video.duration) && target >= video.duration) {
     setStatus('视频已结束，等待节目时间线切换；请核对节目时长。', true);
     return;
@@ -527,8 +533,37 @@ async function sync() {
       sleepTimer.programStart !== data.programStart
     )
       stopForSleepTimer();
+    finalPart = (data.partIndex || 1) === (data.partCount || 1);
+    inTransition = data.status === 'transition';
+    if (inTransition) {
+      currentProgramStart = data.programStart;
+      pending = channelClock = null;
+      if (sleepTimer?.type === 'program' && (video.ended || !started)) stopForSleepTimer();
+      const next = data.nextPlayback;
+      // 保留实际播放中的片尾；播完后才用同一个 video 加载下一集，暂停等待开播。
+      if (next && (!started || video.ended || !current || current === identity(next))) {
+        if (current !== identity(next)) {
+          loadVideo(next.playUrl);
+          current = identity(next);
+          introIdentity = current;
+          needsEntryPosition = true;
+        }
+      }
+      enter.disabled = false;
+      document.querySelector('#current').textContent = `${label(data)} · 过渡中`;
+      document.querySelector('#next').textContent = `接下来：${label(data.next)}`;
+      document.querySelector('#programs').replaceChildren(...data.upcoming.map((program, index) => {
+        const item = document.createElement('li');
+        item.textContent = `${index === 0 ? '过渡中：' : ''}${label(program)} · ${program.duration.toFixed(2)} 秒`;
+        return item;
+      }));
+      setStatus('等待下一节目…', !started || video.paused);
+      boundary = setTimeout(sync, Math.max(100, (data.remaining - delay) * 1000 + 50));
+      return;
+    }
     currentProgramStart = data.programStart;
     if (current !== nextIdentity) {
+      introIdentity = started && current && data.offset < 10 ? nextIdentity : null;
       needsEntryPosition = true;
       loadVideo(data.playUrl);
       current = nextIdentity;
@@ -561,7 +596,7 @@ async function sync() {
 video.addEventListener('loadedmetadata', applyPosition);
 // 画中画的进度条由浏览器提供，页面无法隐藏；用户拖动时立即拉回频道时间线。
 video.addEventListener('seeking', () => {
-  if (mode !== 'live' || positioning || !channelClock || video.readyState < 1) return;
+  if (mode !== 'live' || inTransition || positioning || !channelClock || video.readyState < 1) return;
   const target = channelClock.offset + (performance.now() - channelClock.received) / 1000;
   if (!Number.isFinite(video.duration) || target >= video.duration) return;
   try {
@@ -576,6 +611,7 @@ video.addEventListener('seeked', () => {
 });
 video.addEventListener('ended', () => {
   setScreenAwake(false);
+  if (mode === 'live' && finalPart && sleepTimer?.type === 'program') stopForSleepTimer();
   sync();
 });
 video.addEventListener('play', () => {
@@ -619,7 +655,7 @@ enter.onclick = () => {
   setStatus('正在进入频道…', true);
   // 直接在点击处理函数中请求播放，满足浏览器的声音播放授权要求。
   if (audioContext?.state === 'suspended') audioContext.resume().catch(() => {});
-  playChannel();
+  if (!inTransition) playChannel();
   sync();
 };
 

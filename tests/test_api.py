@@ -26,6 +26,21 @@ def token(expiry=None, marker='initial'):
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
+        directory = TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        data_dir = Path(directory.name)
+        fixture = {
+            'schedule.json': {'channel': 'tiny', 'startTime': '2026-01-01T00:00:00+00:00',
+                              'programs': [{'title': 'Example', 'season': 1, 'episode': 1}]},
+            'sources.json': [{'title': 'Example', 'season': 1, 'episode': 1,
+                              'path': 'show/video.mp4', 'duration': 600}],
+            'media.json': [],
+        }
+        for name, data in fixture.items():
+            (data_dir / name).write_text(json.dumps(data), encoding='utf-8')
+        data_patch = patch('modules.tinytv.timeline.DATA_DIR', data_dir)
+        data_patch.start()
+        self.addCleanup(data_patch.stop)
         self.pb_status = 200
         self.refresh_token = token(marker='refreshed')
         self.requests = []
@@ -188,6 +203,22 @@ class ApiTests(unittest.TestCase):
                 self.assertIsNotNone(record.exc_info[2])
                 self.assertIn('Traceback (most recent call last)', logs.output[0])
                 self.assertIn(str(record.exc_info[1]), logs.output[0])
+
+    def test_transition_returns_next_signed_url_without_exposing_paths(self):
+        from datetime import datetime
+        self.login()
+        self.app.state.settings = replace(self.settings, alist_token='private-token')
+        start = datetime.fromisoformat('2026-01-01T00:00:00+00:00').timestamp()
+        with patch('modules.tinytv.router.time.time', return_value=start + 600):
+            response = self.client.get('/api/tinytv/channels/tiny/now')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'transition')
+        self.assertEqual(data['remaining'], 10)
+        self.assertNotIn('path', data)
+        self.assertNotIn('path', data['nextPlayback'])
+        self.assertIn('sign=', data['nextPlayback']['playUrl'])
+        self.assertEqual(data['nextPlayback']['programStart'], start + 610)
 
     def test_direct_download_path_encoding(self):
         self.app.state.settings = replace(self.settings, alist_root='/baidu/影视 #?')

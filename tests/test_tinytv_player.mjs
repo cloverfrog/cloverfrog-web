@@ -179,3 +179,53 @@ test('默认直播仍同步、纠偏并在视频结束时查询节目', async ()
   await tick();
   assert.equal(p.element('#vod-controls').hidden, true);
 });
+
+const transition = () => ({
+  ...live(600), status: 'transition', remaining: 10,
+  nextPlayback: { ...live(0), programStart: 620, playUrl: '/next.mp4' }
+});
+async function answerSync(p, data) {
+  p.run('sync()');
+  p.requests.at(-1).resolve(response(data));
+  await tick();
+}
+
+test('过渡保留稍长片尾，结束后预加载且暂停，慢加载下一集仍从片头开始', async () => {
+  const p = page();
+  await answerSync(p, live(590));
+  p.run('started = true');
+  const video = p.element('#video');
+  video.paused = false;
+  video.duration = 605;
+  await answerSync(p, transition());
+  assert.equal(video.src, 'https://example.test/live.mp4');
+  assert.match(p.element('#current').textContent, /过渡中/);
+  video.ended = true;
+  await answerSync(p, transition());
+  assert.equal(video.src, 'https://example.test/next.mp4');
+  assert.equal(video.paused, true);
+  video.ended = false;
+  video.currentTime = 0;
+  video.readyState = 0;
+  await answerSync(p, { ...live(4), programStart: 620, playUrl: '/next.mp4' });
+  await answerSync(p, { ...live(20), programStart: 620, playUrl: '/next.mp4' });
+  video.readyState = 1;
+  video.emit('loadedmetadata');
+  assert.equal(video.currentTime, 0);
+  assert.equal(video.paused, false);
+});
+
+test('超过过渡余量强制切集；part 结束不触发整集关闭', async () => {
+  const p = page();
+  await answerSync(p, { ...live(590), partIndex: 1, partCount: 2 });
+  p.run('started = true; startProgramEndSleepTimer()');
+  p.element('#video').emit('ended');
+  assert.equal(p.run('sleepTimer.type'), 'program');
+  p.requests.at(-1).resolve(response({ ...live(0), playUrl: '/part2.mp4', partIndex: 2, partCount: 2 }));
+  await tick();
+  await answerSync(p, transition());
+  await answerSync(p, { ...live(1), programStart: 620, playUrl: '/next.mp4' });
+  assert.equal(p.element('#video').src, 'https://example.test/next.mp4');
+  assert.equal(p.run('started'), false);
+  assert.equal(p.run('sleepTimer'), null);
+});
