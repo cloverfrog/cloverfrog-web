@@ -52,11 +52,7 @@ class Display(BaseModel):
 
 def configuration(record):
     try:
-        collection = record['data_collection']
-        if not isinstance(collection, str) or not KEY.fullmatch(collection):
-            raise ValueError()
-        display = Display.model_validate(record['display'])
-        return collection, display
+        return Display.model_validate(record['display'])
     except (KeyError, ValueError, TypeError):
         raise HTTPException(503, 'Invalid collection configuration') from None
 

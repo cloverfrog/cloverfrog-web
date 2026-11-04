@@ -84,7 +84,7 @@ async def types(request: Request, page: int = Query(1, ge=1, le=100000),
 @router.get('/types/{key}')
 async def detail(key: str, request: Request, identity: Identity = Depends(require_user)):
     record = await read_type(request, identity, key)
-    _, display = configuration(record)
+    display = configuration(record)
     return {**type_summary(record),
             'properties': [{'label': prop.label, 'format': prop.format} for prop in display.properties]}
 
@@ -93,12 +93,12 @@ async def detail(key: str, request: Request, identity: Identity = Depends(requir
 async def items(key: str, request: Request, page: int = Query(1, ge=1, le=100000),
                 identity: Identity = Depends(require_user)):
     record = await read_type(request, identity, key)
-    collection, display = configuration(record)
+    display = configuration(record)
     fields = {'id', display.title_field, display.identifier_field}
     fields.update(prop.field for prop in display.properties)
     # Request resource presence, but never expose the underlying reference to the browser.
     fields.update(resource.field for resource in display.resources.values())
-    result = await pb_get(request, identity, f'{collection}/records', page=page,
+    result = await pb_get(request, identity, f'{key}/records', page=page,
                           perPage=24, sort='id', fields=','.join(sorted(fields)))
     metadata = page_result(result)
     cards = []
@@ -126,11 +126,11 @@ async def resource(key: str, record_id: str, slot: str, request: Request,
     if not RECORD_ID.fullmatch(record_id) or not KEY.fullmatch(slot):
         raise HTTPException(404, 'Not found')
     record = await read_type(request, identity, key)
-    collection, display = configuration(record)
+    display = configuration(record)
     if slot not in display.resources:
         raise HTTPException(404, 'Not found')
     field = display.resources[slot].field
-    item = await pb_get(request, identity, f'{collection}/records/{record_id}', fields=f'id,{field}')
+    item = await pb_get(request, identity, f'{key}/records/{record_id}', fields=f'id,{field}')
     if not item.get(field):
         raise HTTPException(404, 'Not found')
     url = resource_url(record.get('media_gateway'), item[field])

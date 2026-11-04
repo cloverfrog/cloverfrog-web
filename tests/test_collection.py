@@ -31,7 +31,7 @@ class CollectionTests(unittest.TestCase):
         self.empty_types = False
         self.type_record = {
             'id': self.type_id, 'key': 'example', 'name': 'Example',
-            'data_collection': 'example_records', 'allowed_users': ['private-user'],
+            'allowed_users': ['private-user'],
             'media_gateway': 'http://media.example/internal/',
             'display': {
                 'title_field': 'caption', 'identifier_field': 'source_code',
@@ -77,7 +77,7 @@ class CollectionTests(unittest.TestCase):
 
     @property
     def base(self):
-        return '/api/collection/types/example'
+        return '/api/collection/types/' + self.type_record['key']
 
     @property
     def media(self):
@@ -118,6 +118,7 @@ class CollectionTests(unittest.TestCase):
         upstream = self.requests[-1]
         self.assertEqual(upstream.url.params['perPage'], '24')
         self.assertEqual(upstream.url.params['sort'], 'id')
+        self.assertEqual(upstream.url.path, '/api/collections/example/records')
         self.assertNotIn('filter', upstream.url.params)
         self.assertNotIn('expand', upstream.url.params)
         self.assertEqual(upstream.headers['Authorization'], token(marker='refreshed'))
@@ -125,7 +126,7 @@ class CollectionTests(unittest.TestCase):
 
     def test_other_schema_and_gateway_need_no_code_changes(self):
         self.login()
-        self.type_record['data_collection'] = 'different_records'
+        self.type_record['key'] = 'different_records'
         self.type_record['display'] = {
             'title_field': 'heading', 'identifier_field': 'external_key',
             'properties': [{'field': 'complete', 'label': 'Done', 'format': 'boolean'}],
@@ -171,6 +172,8 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(response.headers['cache-control'], 'private, no-store')
         self.assertEqual(response.headers['x-content-type-options'], 'nosniff')
         upstream = self.requests[-1]
+        record_request = self.requests[-2]
+        self.assertEqual(record_request.url.path, '/api/collections/example/records/' + self.record_id)
         self.assertEqual(upstream.url.path, '/internal/folder/图 片.png')
         self.assertNotIn('Authorization', upstream.headers)
         self.assertNotIn('cookie', upstream.headers)

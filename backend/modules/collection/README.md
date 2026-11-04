@@ -10,9 +10,8 @@
 
 | 字段 | 配置 |
 | --- | --- |
-| `key` | Text，必填，最大 64，格式 `[a-zA-Z0-9_][a-zA-Z0-9_-]{0,63}`，唯一索引 |
+| `key` | Text，必填，最大 64，格式 `[a-zA-Z0-9_][a-zA-Z0-9_-]{0,63}`，唯一索引；同时作为类型代号和业务表名称，必须与目标 PocketBase Collection 名称一致 |
 | `name` | Text，必填，建议最大 100；页面显示名称 |
-| `data_collection` | Text，必填，目标业务 Collection 的 ID（推荐）或名称；字符限字母、数字、下划线、连字符，最大 64 |
 | `allowed_users` | Relation → `users`，多值，选择允许查看此类型的账号 |
 | `media_gateway` | URL，媒体网关基础地址；支持 HTTP/HTTPS，可带目录前缀，不能带账号密码、查询参数或锚点 |
 | `display` | JSON，必填，保存下述展示协议 |
@@ -35,7 +34,7 @@ Create/Update/Delete 保持 **locked**。配置由管理员在后台维护，不
 
 ## 业务表与字段映射
 
-每个类型独立创建业务 Base Collection，字段名与结构由数据本身决定。PocketBase 内部 `id` 保持默认 15 位小写字母或数字，用于接口定位；原始业务 ID 使用单独字段，在本表建立唯一索引，用于未来导入和去重，无需跨表统一。
+每个类型独立创建业务 Base Collection，名称与注册记录的 `key` 完全一致，不另设目标表映射。例如 `key` 为 `example` 时，后端读取 `example` 表；更改业务表名时需要同步修改注册记录的 `key` 和页面链接中的 `type`。字段名与结构由数据本身决定。PocketBase 内部 `id` 保持默认 15 位小写字母或数字，用于接口定位；原始业务 ID 使用单独字段，在本表建立唯一索引，用于未来导入和去重，无需跨表统一。
 
 各业务表独立维护 List/View Rules，规则必须要求登录，并按需要限制账号或记录。类型可见性不会自动授权业务表。阶段 1 的 Create/Update/Delete 保持 locked，测试记录在后台手动录入。业务表可自行使用 Relation → users 表达权限；无需创建框架专用账号权限字段。
 
