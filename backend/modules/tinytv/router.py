@@ -86,6 +86,13 @@ async def now(request: Request):
         result['playUrl'] = await request.app.state.tinytv_playback_url.get(
             request.app.state.http, settings, result, source,
         )
+    upcoming = result.get('nextPlayback')
+    if upcoming:
+        if not hasattr(request.app.state, 'tinytv_next_url'):
+            request.app.state.tinytv_next_url = PlaybackURL()
+        upcoming['playUrl'] = await request.app.state.tinytv_next_url.get(
+            request.app.state.http, request.app.state.settings, upcoming, upcoming.pop('path'),
+        )
     return result
 
 

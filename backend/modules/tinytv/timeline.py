@@ -5,6 +5,8 @@ import math
 from datetime import datetime
 from pathlib import Path
 
+TRANSITION_SECONDS = 10
+
 DATA_DIR = Path("data/tinytv")
 
 
@@ -91,7 +93,7 @@ def timeline(schedule, sources, now, media=None):
         parts = source_parts(index[key], program.get("duration"))
         programs.append({**program, "duration": sum(part["duration"] for part in parts)})
     # 总时长决定循环周期；开播前不尝试定位视频，只向前端返回等待状态。
-    total = sum(p["duration"] for p in programs)
+    total = sum(p["duration"] + TRANSITION_SECONDS for p in programs)
     epoch = start.timestamp()
     if now < epoch:
         return {"status": "waiting", "serverTime": now, "startTime": epoch}
@@ -100,15 +102,16 @@ def timeline(schedule, sources, now, media=None):
     cursor = epoch + cycle * total
     for position, program in enumerate(programs):
         end = cursor + program["duration"]
-        # 边界采用左闭右开区间，恰好到结束时间时切入下一节目。
-        if now < end:
+        # 播放结束后保留过渡区间，过渡结束才进入下一节目。
+        if now < end + TRANSITION_SECONDS:
+            transitioning = now >= end
             key = (program["title"], program["season"], program["episode"])
             parts = source_parts(index[key], program["duration"])
-            program_offset = now - cursor
+            program_offset = min(now - cursor, program["duration"])
             part_cursor = 0.0
             for part_index, part in enumerate(parts):
                 part_end = part_cursor + part["duration"]
-                if program_offset < part_end:
+                if program_offset < part_end or (transitioning and part_index == len(parts) - 1):
                     break
                 part_cursor = part_end
             else:
@@ -121,11 +124,13 @@ def timeline(schedule, sources, now, media=None):
             return {
                 **current,
                 "channel": schedule["channel"],
-                "status": "playing",
+                "status": "transition" if transitioning else "playing",
+                "transitionEnd": end + TRANSITION_SECONDS,
+                "nextPlayback": timeline(schedule, sources, end + TRANSITION_SECONDS, media) if transitioning else None,
                 "path": part["path"],
                 "offset": program_offset - part_cursor,
-                "remaining": part_end - program_offset,
-                "programRemaining": end - now,
+                "remaining": end + TRANSITION_SECONDS - now if transitioning else part_end - program_offset,
+                "programRemaining": max(0, end - now),
                 "programStart": cursor,
                 "programEnd": end,
                 "partIndex": part_index + 1,
@@ -134,6 +139,6 @@ def timeline(schedule, sources, now, media=None):
                 "next": program_details(programs[(position + 1) % len(programs)], names),
                 "upcoming": upcoming,
             }
-        cursor = end
+        cursor = end + TRANSITION_SECONDS
     raise ValueError("Unable to locate program")
 
