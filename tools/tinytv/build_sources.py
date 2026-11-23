@@ -95,6 +95,7 @@ def build_records(config, files):
         for season in show['seasons']:
             number = int(season['season'])
             count = int(season['episodes'])
+            start = int(season.get('startEpisode', 1))
             template = season['pattern']
             episode_parts = season.get('episodeParts', {})
             if not isinstance(episode_parts, dict):
@@ -110,7 +111,8 @@ def build_records(config, files):
                 matched = []
                 failed = False
                 for raw_pattern in patterns:
-                    pattern = raw_pattern.format(season=number, episode=episode).lstrip('/')
+                    file_episode = start + episode - 1
+                    pattern = raw_pattern.format(season=number, episode=file_episode).lstrip('/')
                     matches = sorted(path for path in files if fnmatch.fnmatchcase(path, pattern))
                     if len(matches) != 1:
                         message = f'{title} S{number}E{episode}: 匹配到 {len(matches)} 个文件 [{pattern}]'

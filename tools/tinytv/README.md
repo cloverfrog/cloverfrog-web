@@ -8,12 +8,13 @@
 python tools/tinytv/build_sources.py --config sources_config.json --output backend/data/tinytv/sources.json
 ```
 
-普通剧集输出 `title`、`season`、`episode` 和相对于 `ALIST_ROOT` 的 `path`，不探测 `duration`。一个逻辑剧集需要依次播放多个文件时，在对应 season 中用 `episodeParts` 显式列出各 part 的匹配规则：
+普通剧集输出 `title`、`season`、`episode` 和相对于 `ALIST_ROOT` 的 `path`，不探测 `duration`。一个逻辑剧集需要依次播放多个文件时，在对应 season 中用 `episodeParts` 显式列出各 part 的匹配规则。部分作品的文件集号跨季连续编号，可在对应 season 中设置可选字段 startEpisode，指定该季第一个文件的编号：
 
 ```json
 {
-  "season": 5,
-  "episodes": 20,
+  "season": 1,
+  "episodes": 13,
+  "startEpisode": 14,
   "pattern": "Show/S{season:02d}E{episode:02d}.mp4",
   "episodeParts": {
     "12": [
@@ -24,7 +25,7 @@ python tools/tinytv/build_sources.py --config sources_config.json --output backe
 }
 ```
 
-每条 part 规则必须恰好匹配一个文件，且同一集不能重复匹配同一文件；输出使用有序的 `parts: [{"path": ...}, ...]`。没有列入 `episodeParts` 的剧集继续要求普通 `pattern` 恰好匹配一个文件。生成后再运行 `probe_durations.py`；它会分别探测每个文件，跳过已有有效时长，并从既有输出恢复路径未变化的结果。
+每条 part 规则必须恰好匹配一个文件，且同一集不能重复匹配同一文件；输出使用有序的 `parts: [{"path": ...}, ...]`。没有列入 `episodeParts` 的剧集继续要求普通 `pattern` 恰好匹配一个文件。startEpisode 默认为 1，仅影响文件名匹配，不影响生成的季内集号。生成后再运行 `probe_durations.py`；它会分别探测每个文件，跳过已有有效时长，并从既有输出恢复路径未变化的结果。
 
 `--dry-run` 会完成 AList 枚举和匹配检查，但不写输出文件。AList 对 `ALIST_ROOT` 需要允许目录浏览。
 
